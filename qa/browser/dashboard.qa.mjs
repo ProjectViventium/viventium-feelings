@@ -442,7 +442,7 @@ try {
   await cli('screenshot', '--filename', 'qa/artifacts/dashboard-browser-qa.png', '--hires');
   await cli('click', '#eraseButton');
   snapshot = await cli('snapshot');
-  if (!/Erase all local Feelings data\?/u.test(snapshot)) throw new Error('erase_confirmation_missing');
+  if (!/Erase Feelings from this host\?/u.test(snapshot)) throw new Error('erase_confirmation_missing');
   await cli('click', '#confirmAction');
   await cli('run-code', 'async (page) => { await page.waitForTimeout(300); }');
   snapshot = await cli('snapshot');

@@ -1,6 +1,6 @@
 # Threat model
 
-Status: release-gate model for `0.1.2`.
+Status: release-gate model for `0.1.3`.
 
 ## Trust boundaries and assets
 
@@ -54,7 +54,9 @@ control assets.
   managed command. Codex branding is declarative manifest metadata and does not edit user
   configuration.
 - **Local files disclose prompt content.** Gate files contain keyed identifiers and fixed metadata
-  only. State and audit files are user-only. Erase cascades through state, jobs, audit, and key.
+  only. State and audit files are user-only. Erase cascades through state, jobs, audit, key, and the
+  exact Viventium-owned Claude status presence after explicit confirmation. Cleanup refuses foreign
+  status lines and reports a partial cleanup without undoing data erasure.
 - **Unbounded cost or denial of service.** Hook input, stimulus, capsule UTF-8 bytes, HTTP body,
   child output, model time, active appraisal count, pending queue, audit, trail, ledger, and job age
   are capped. A retry cannot create a second paid call. The visible response never waits for appraisal.
@@ -66,7 +68,8 @@ control assets.
   host transcripts or provider records.
 - Host CLI flags and plugin hook contracts can change; native version QA is required per release.
 - Claude currently exposes no plugin-uninstall cleanup hook. Users who opted into Add V must use
-  Remove V before uninstall; the supported lifecycle is documented and tested in an isolated home.
+  Remove V or Erase everything before uninstall; both supported lifecycles are tested in an isolated
+  home.
 - Codex's beta filesystem permission profile is a host boundary, not a formally verified OS jail in
   this package; native version QA remains mandatory.
 - Behavioral influence is probabilistic. Typed state integrity does not guarantee a particular tone.

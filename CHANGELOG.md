@@ -3,6 +3,25 @@
 All notable changes to Viventium Feelings are documented here. This project follows Semantic
 Versioning once the first public release is tagged.
 
+## [0.1.3] - 2026-07-19
+
+### Fixed
+
+- Restored the owner-approved Reaction Cortex default so strength matches how much the moment
+  matters instead of biasing appraisal toward the minimum category.
+- Added an exact legacy-default migration: the formerly shipped weak default upgrades on read while
+  every custom user instruction remains unchanged.
+- Made **Erase everything** remove an explicitly installed Viventium-owned Claude status line from
+  both dashboard and MCP erase flows. Foreign status lines remain untouched, and partial cleanup is
+  reported without undoing the completed data erasure.
+
+### Changed
+
+- Clarified erase/uninstall guidance, privacy boundaries, threat handling, and release acceptance
+  around owned host presence.
+- Synchronized every package, marketplace, host manifest, citation, and MCP version surface at
+  `0.1.3`.
+
 ## [0.1.2] - 2026-07-19
 
 ### Changed
@@ -50,8 +69,7 @@ Versioning once the first public release is tagged.
 - Corrected status-line health wording so a disabled system is `paused`, an untouched enabled
   system is `waiting`, and queue pressure or a completion timeout is `needs attention` rather than
   a false pause.
-- Aligned the plugin's default Reaction Cortex instruction with the timestamped core Feelings source
-  of truth; strengthened MCP mutation metadata and the dashboard's HTML-sink regression guard.
+- Strengthened MCP mutation metadata and the dashboard's HTML-sink regression guard.
 - Kept the active Claude/Codex host visible on mobile instead of hiding the host badge.
 
 ### Notes

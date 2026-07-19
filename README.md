@@ -87,14 +87,14 @@ the browser favicon and native host surfaces are described separately and honest
 
 ### Update or remove
 
-If you enabled **Add V** in Claude Code, remove it first from the dashboard (**Settings → Claude
-status line → Remove V**) or ask:
+If you enabled **Add V** in Claude Code, either use **Erase everything** or remove it first from the
+dashboard (**Settings → Claude status line → Remove V**) or ask:
 
 > Remove Viventium Feelings from my Claude status line.
 
-Claude does not currently provide a plugin-uninstall cleanup hook. Removing V first is therefore
-the supported path: it removes only Viventium's owned status-line setting and script, while the
-plugin is still present to do so. It never replaces or deletes another custom status line.
+Claude does not currently provide a plugin-uninstall cleanup hook. Both dashboard actions remove
+only Viventium's owned status-line setting and script while the plugin is still present; they never
+replace or delete another custom status line.
 
 Claude Code updates and removes the installed plugin natively:
 
@@ -111,10 +111,9 @@ codex plugin remove viventium-feelings@project-viventium
 codex plugin add viventium-feelings@project-viventium
 ```
 
-Before uninstalling, use **Erase local data** in the dashboard if you also want the state, trail,
-audit, gates, and local keys removed. Erase and Remove V are intentionally separate: erasing
-Feelings data does not silently edit Claude settings. Restart the host after an install, update, or
-removal.
+Before uninstalling, use **Erase everything** in the dashboard if you also want state, trail, audit,
+gates, local keys, and the owned Claude V status line removed. Use **Remove V** when you want to keep
+Feelings data but remove only the status line. Restart the host after an install, update, or removal.
 
 ## The first 90 seconds
 
@@ -164,8 +163,8 @@ full semantics.
 - Dashboard assets are local. The server binds to `127.0.0.1`; API routes require a launch token or
   same-session cookie; every request is Host-checked; no CORS permission or remote asset is present;
   and the server closes after inactivity.
-- Off means no emotional context and no appraisal. Erase removes state, trail, gates, audit, and
-  local coordination keys, including recovery/quarantine files.
+- Off means no emotional context and no appraisal. Erase removes state, trail, gates, audit, local
+  coordination keys, recovery/quarantine files, and the exact Viventium-owned Claude status line.
 
 Your host/provider may retain its own chats, hook context, or model-service records under your
 Anthropic or OpenAI settings. Local Feelings erase cannot remove those records. See

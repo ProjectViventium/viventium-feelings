@@ -104,7 +104,7 @@ test('installed Codex MCP derives its isolated home from the plugin cache root',
     'cache',
     'project-viventium',
     'viventium-feelings',
-    '0.1.2',
+    '0.1.3',
   );
   try {
     assert.equal(

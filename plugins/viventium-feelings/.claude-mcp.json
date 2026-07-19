@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "viventium-feelings": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/runtime/mcp-server.mjs"],
+      "env": {
+        "VIVENTIUM_FEELINGS_HOST": "claude"
+      }
+    }
+  }
+}

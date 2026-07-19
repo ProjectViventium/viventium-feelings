@@ -1,0 +1,24 @@
+{
+  "name": "viventium-feelings",
+  "version": "0.1.0",
+  "description": "Persistent local emotional state and a live feelings dashboard for Codex.",
+  "author": {
+    "name": "Adrien Beyk",
+    "url": "https://www.viventium.ai/"
+  },
+  "homepage": "https://github.com/ProjectViventium/viventium-feelings",
+  "repository": "https://github.com/ProjectViventium/viventium-feelings",
+  "license": "Apache-2.0",
+  "keywords": ["feelings", "emotions", "personality", "affect", "viventium"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Viventium Feelings",
+    "shortDescription": "Feelings that move, persist, and fade.",
+    "longDescription": "Give Codex a persistent local emotional layer with nine decaying feelings, transparent Nature profiles, typed reactions, and a private live dashboard.",
+    "developerName": "Adrien Beyk · Project Viventium",
+    "category": "Productivity",
+    "capabilities": ["Persistent local feelings", "Live private dashboard", "Nature profiles", "Automatic future-turn reactions"],
+    "defaultPrompt": "Open my Viventium Feelings dashboard and help me choose a Nature profile."
+  },
+  "mcpServers": "./.codex-mcp.json"
+}

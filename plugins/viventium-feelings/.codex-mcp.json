@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "viventium-feelings": {
+      "command": "node",
+      "args": ["./runtime/mcp-server.mjs"],
+      "cwd": ".",
+      "env": {
+        "VIVENTIUM_FEELINGS_HOST": "codex"
+      }
+    }
+  }
+}

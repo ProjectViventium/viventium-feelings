@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Viventium Feelings</title>
+    <link rel="stylesheet" href="/dashboard.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#now" aria-label="Viventium Feelings home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span><strong>Viventium</strong><small>Feelings</small></span>
+        </a>
+        <div class="topbar-actions">
+          <span id="hostBadge" class="host-badge">Local</span>
+          <label class="power-control">
+            <span id="powerLabel">Off</span>
+            <input id="powerToggle" type="checkbox" role="switch" aria-label="Enable Feelings">
+            <span aria-hidden="true"></span>
+          </label>
+        </div>
+      </header>
+
+      <aside class="side-nav" aria-label="Dashboard sections">
+        <a href="#now" class="active">Now</a>
+        <a href="#nature">Nature</a>
+        <a href="#trail">Trail</a>
+        <a href="#settings">Settings</a>
+        <a href="#about">About</a>
+      </aside>
+
+      <main>
+        <section id="now" class="now-section" aria-labelledby="nowTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Live emotional state</p>
+              <h1 id="nowTitle">Now</h1>
+            </div>
+            <p id="freshness" class="freshness" aria-live="polite">Connecting…</p>
+          </div>
+
+          <div class="instrument-layout">
+            <div id="bands" class="bands" aria-live="polite" aria-busy="true"></div>
+            <aside class="state-inspector" aria-label="Current private reaction">
+              <p class="eyebrow">Inner state</p>
+              <blockquote id="innerState">No reaction yet.</blockquote>
+              <div class="health-line">
+                <span id="healthDot" class="health-dot" aria-hidden="true"></span>
+                <span id="healthText">Waiting for first reaction</span>
+              </div>
+              <dl class="state-meta">
+                <div><dt>Profile</dt><dd id="activeProfile">Grounded</dd></div>
+                <div><dt>State</dt><dd id="stateVersion">v0</dd></div>
+                <div><dt>Host</dt><dd id="activeHost">Local</dd></div>
+              </dl>
+            </aside>
+          </div>
+        </section>
+
+        <section id="nature" class="section-block" aria-labelledby="natureTitle">
+          <div class="section-heading compact">
+            <div><p class="eyebrow">Resting personality</p><h2 id="natureTitle">Nature</h2></div>
+            <p>Profiles are transparent starting points. Every value remains yours to tune.</p>
+          </div>
+          <div id="profiles" class="profile-list" role="list"></div>
+        </section>
+
+        <section id="trail" class="section-block" aria-labelledby="trailTitle">
+          <div class="section-heading compact">
+            <div><p class="eyebrow">What moved</p><h2 id="trailTitle">Reaction trail</h2></div>
+            <p>Typed changes only. Your prompt text is never stored here.</p>
+          </div>
+          <ol id="trailList" class="trail-list"></ol>
+        </section>
+
+        <section id="settings" class="section-block" aria-labelledby="settingsTitle">
+          <div class="section-heading compact">
+            <div><p class="eyebrow">Control</p><h2 id="settingsTitle">Settings</h2></div>
+            <p>Adjust how reactions are judged, or return Current to Nature.</p>
+          </div>
+          <div class="settings-layout">
+            <div class="field-group">
+              <label for="reactionInstruction">Reaction Cortex instruction</label>
+              <textarea id="reactionInstruction" maxlength="4000" rows="5"></textarea>
+              <div class="field-actions"><span id="instructionCount">0 / 4000</span><button id="saveInstruction" class="quiet-button">Save instruction</button></div>
+            </div>
+            <div class="control-list">
+              <button id="resetButton" class="control-row"><span><strong>Reset Current</strong><small>Return all feelings to Nature</small></span><b>Reset</b></button>
+              <button id="pauseButton" class="control-row"><span><strong>Pause Feelings</strong><small>Stop context and reactions; keep state</small></span><b>Pause</b></button>
+              <button id="eraseButton" class="control-row danger"><span><strong>Erase local data</strong><small>Remove state, trail, gates, audit, and key</small></span><b>Erase</b></button>
+            </div>
+          </div>
+        </section>
+
+        <section id="about" class="section-block about" aria-labelledby="aboutTitle">
+          <p class="eyebrow">One cortex of a larger mind</p>
+          <h2 id="aboutTitle">Keep the intelligence. Own the emotional layer.</h2>
+          <p>Feelings is a lightweight taste of Viventium—the conscious, subconscious, cognitive AI system created by Adrien Beyk.</p>
+          <div class="about-links">
+            <a href="https://www.viventium.ai/" rel="noreferrer">Explore Viventium</a>
+            <a href="https://www.linkedin.com/in/adrienbeyk" rel="noreferrer">Adrien Beyk</a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="bandDialog" aria-labelledby="bandDialogTitle">
+      <form method="dialog" class="dialog-shell">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">Tune this feeling</p><h2 id="bandDialogTitle">Band</h2></div>
+          <button value="cancel" class="icon-button" aria-label="Close">×</button>
+        </div>
+        <p id="bandDescription" class="dialog-description"></p>
+        <label for="currentInput">Current <output id="currentOutput"></output></label>
+        <input id="currentInput" type="range" min="0" max="100" step="1">
+        <label for="natureInput">Nature <output id="natureOutput"></output></label>
+        <input id="natureInput" type="range" min="0" max="100" step="1">
+        <label for="halfLifeInput">Half-life in minutes</label>
+        <input id="halfLifeInput" type="number" min="1" max="525600" step="1">
+        <label class="check-row"><input id="bandEnabled" type="checkbox"> Include this band in Feelings</label>
+        <details class="range-editor">
+          <summary>Range embodiment</summary>
+          <p>Add optional language to any of this feeling's five built-in ranges. The built-in meaning always remains visible. The active capsule has a shared 2,400-byte safety limit.</p>
+          <div id="rangePrompts"></div>
+        </details>
+        <div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button id="saveBand" value="default" class="primary-button">Save changes</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="confirmDialog" aria-labelledby="confirmTitle">
+      <form method="dialog" class="confirm-shell">
+        <p class="eyebrow">Please confirm</p>
+        <h2 id="confirmTitle">Confirm action</h2>
+        <p id="confirmText"></p>
+        <div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button id="confirmAction" value="default" class="danger-button">Continue</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="onboardingDialog" aria-labelledby="onboardingTitle">
+      <form method="dialog" class="confirm-shell onboarding-shell">
+        <p class="eyebrow">Before you turn it on</p>
+        <h2 id="onboardingTitle">Your feelings stay local. Appraisal uses your host.</h2>
+        <p>Viventium stores typed feeling state, settings, health, and a bounded reaction trail in this host's private plugin-data folder.</p>
+        <p>After a completed reply, the newest prompt and current feeling state are sent to an isolated Claude Code or Codex model call. This may use your existing plan quota. Viventium runs no account, analytics, or hosted state service.</p>
+        <p>Raw prompts and answers are not written by Feelings. Your host/provider may retain its own records under your account settings. Continue only acknowledges this disclosure—it does not enable the feature.</p>
+        <div class="dialog-actions"><button value="default" class="primary-button">I understand</button></div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/dashboard.js"></script>
+  </body>
+</html>

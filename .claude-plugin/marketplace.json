@@ -1,0 +1,25 @@
+{
+  "name": "project-viventium",
+  "owner": {
+    "name": "Adrien Beyk"
+  },
+  "metadata": {
+    "description": "Open-source cognitive layers from Project Viventium"
+  },
+  "plugins": [
+    {
+      "name": "viventium-feelings",
+      "source": "./plugins/viventium-feelings",
+      "description": "Feelings that move, persist, and fade for Claude Code.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrien Beyk"
+      },
+      "homepage": "https://github.com/ProjectViventium/viventium-feelings",
+      "repository": "https://github.com/ProjectViventium/viventium-feelings",
+      "license": "Apache-2.0",
+      "keywords": ["feelings", "emotions", "personality", "affect", "viventium"],
+      "category": "productivity"
+    }
+  ]
+}

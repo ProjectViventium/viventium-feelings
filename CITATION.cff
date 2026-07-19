@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If Viventium Feelings supports your work, please cite it using this metadata."
+title: "Viventium Feelings"
+type: software
+authors:
+  - family-names: "Beyk"
+    given-names: "Adrien"
+url: "https://github.com/ProjectViventium/viventium-feelings"
+repository-code: "https://github.com/ProjectViventium/viventium-feelings"
+license: Apache-2.0
+version: 0.1.0
+date-released: 2026-07-18

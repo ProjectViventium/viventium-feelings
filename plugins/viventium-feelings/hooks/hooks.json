@@ -1,0 +1,28 @@
+{
+  "description": "Inject the current Viventium feeling state, then release a future-turn reaction after a completed reply.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/user-prompt-submit.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Feeling the moment"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

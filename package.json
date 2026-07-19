@@ -1,0 +1,17 @@
+{
+  "name": "viventium-feelings",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persistent local emotional state for Claude Code and Codex.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "validate:static": "node scripts/validate-packages.mjs --static-only",
+    "validate": "node scripts/validate-packages.mjs",
+    "qa:browser": "node qa/browser/dashboard.qa.mjs"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Viventium Feelings"
+  short_description: "See and shape persistent local feelings"
+  default_prompt: "Open my Viventium Feelings dashboard and explain what is moving."
+
+policy:
+  allow_implicit_invocation: true

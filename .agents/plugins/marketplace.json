@@ -1,0 +1,20 @@
+{
+  "name": "project-viventium",
+  "interface": {
+    "displayName": "Project Viventium"
+  },
+  "plugins": [
+    {
+      "name": "viventium-feelings",
+      "source": {
+        "source": "local",
+        "path": "./plugins/viventium-feelings"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

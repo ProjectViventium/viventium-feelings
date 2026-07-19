@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+coverage/
+qa/artifacts/
+.playwright-cli/
+*.log
+*.tmp
+.env
+.env.*
+state/
+dist/

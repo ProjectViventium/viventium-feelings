@@ -1,0 +1,15 @@
+{
+  "name": "viventium-feelings",
+  "version": "0.1.0",
+  "description": "Persistent local emotional state and a live feelings dashboard for Claude Code.",
+  "author": {
+    "name": "Adrien Beyk",
+    "url": "https://www.viventium.ai/"
+  },
+  "homepage": "https://github.com/ProjectViventium/viventium-feelings",
+  "repository": "https://github.com/ProjectViventium/viventium-feelings",
+  "license": "Apache-2.0",
+  "keywords": ["feelings", "emotions", "personality", "affect", "viventium"],
+  "skills": ["./skills/"],
+  "mcpServers": "./.claude-mcp.json"
+}

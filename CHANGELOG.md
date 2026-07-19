@@ -22,6 +22,12 @@ Versioning once the first public release is tagged.
 - Synchronized every package, marketplace, host manifest, citation, and MCP version surface at
   `0.1.3`.
 
+### Verification
+
+- 100 unit/contract tests pass on the current runtime and exact minimum Node 20.11.1; isolated
+  Claude/Codex package lifecycles, real Chromium, both live appraisers, both full reaction
+  lifecycles, behavioral steering, and hostile/permission-boundary smokes also pass.
+
 ## [0.1.2] - 2026-07-19
 
 ### Changed

@@ -95,7 +95,9 @@ The output is strict JSON:
 ```
 
 - At most one operation per band and at most nine total.
-- `slight`, `clear`, and `strong` apply deterministic deltas `3`, `8`, and `15`.
+- `slight`, `clear`, and `strong` apply deterministic deltas `3`, `8`, and `15`. They mean,
+  respectively, a subtle but real movement, an unmistakable movement, and a pronounced movement
+  with high felt impact. The appraiser chooses proportionally and does not default to `slight`.
 - Causes are a closed enum. Manual changes use separate runtime-only causes.
 - `changes: []` is valid.
 - Inner state is one trimmed first-person line, `1..280` characters.

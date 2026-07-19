@@ -23,7 +23,10 @@ function cli(...args) {
     child.on('error', reject);
     child.on('close', (code) => {
       const output = `${Buffer.concat(stdout).toString('utf8')}\n${Buffer.concat(stderr).toString('utf8')}`;
-      if (code !== 0) return reject(new Error(`playwright_cli_failed:${args[0]}:${output.slice(0, 800)}`));
+      const reportedError = /(?:^|\n)### Error(?:\s|$)/u.test(output);
+      if (code !== 0 || reportedError) {
+        return reject(new Error(`playwright_cli_failed:${args[0]}:${output.slice(0, 800)}`));
+      }
       resolve(output);
     });
   });
@@ -221,7 +224,7 @@ try {
   }
   await cli('run-code', `async (page) => { await page.goto(${JSON.stringify(dashboard.url)}); await page.waitForTimeout(250); }`);
   await cli('run-code', `async (page) => {
-    const reading = (await page.locator('.band[data-band="curiosity"] .band-reading b').textContent()).trim();
+    const reading = (await page.locator('.band[data-band="curiosity"] [data-value="current"]').textContent()).trim();
     if (reading !== '74') throw new Error('curiosity_reaction_value:' + reading);
   }`);
   await store.recordReactionHealth({
@@ -242,7 +245,7 @@ try {
   clock = new Date('2026-07-18T12:45:00.000Z');
   await cli('run-code', 'async (page) => { await page.waitForTimeout(2300); }');
   await cli('run-code', `async (page) => {
-    const reading = (await page.locator('.band[data-band="curiosity"] .band-reading b').textContent()).trim();
+    const reading = (await page.locator('.band[data-band="curiosity"] [data-value="current"]').textContent()).trim();
     if (reading !== '70') throw new Error('live_decay_not_rendered_without_version_change:' + reading);
   }`);
   await cli('run-code', `async (page) => {
@@ -485,7 +488,7 @@ try {
   await cli('click', 'button:has-text("Apply Warm")');
   await cli('run-code', `async (page) => {
     await page.waitForTimeout(300);
-    const care = (await page.locator('.band[data-band="care"] .band-reading b').textContent()).trim();
+    const care = (await page.locator('.band[data-band="care"] [data-value="current"]').textContent()).trim();
     if (care !== '86') throw new Error('profile_not_applied:care=' + care);
   }`);
   await cli('click', '#powerToggle');
@@ -518,10 +521,6 @@ try {
   snapshot = await cli('snapshot');
   if (!/Reset Current to Nature\?/u.test(snapshot)) throw new Error('reset_confirmation_missing');
   await cli('click', '#confirmAction');
-  await cli('run-code', `async (page) => {
-    await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
-      && document.querySelector('#onboardingResult')?.textContent.includes('Codex plugin identity remains'));
-  }`);
   await cli('screenshot', '--filename', 'qa/artifacts/dashboard-browser-qa.png', '--hires');
   snapshot = await cli('snapshot');
   if (!/Remove Feelings data; Codex identity remains until plugin removal/u.test(snapshot)) {
@@ -534,7 +533,10 @@ try {
     throw new Error('codex_erase_confirmation_scope_missing');
   }
   await cli('click', '#confirmAction');
-  await cli('run-code', 'async (page) => { await page.waitForTimeout(300); }');
+  await cli('run-code', `async (page) => {
+    await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
+      && document.querySelector('#onboardingResult')?.textContent.includes('Codex plugin identity remains'));
+  }`);
   snapshot = await cli('snapshot');
   if (!/Before you turn it on|Your feelings stay local/u.test(snapshot)) {
     throw new Error('erase_did_not_restore_onboarding_disclosure');

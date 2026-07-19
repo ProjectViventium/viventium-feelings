@@ -53,9 +53,9 @@ control assets.
   metacharacters in the config path cannot become shell syntax. The plugin refuses a symlinked
   managed directory or renderer, writes its renderer through a synced temporary file, and verifies
   exact deterministic contents plus inode identity before treating an orphaned renderer as owned.
-  Disable removes only the exact managed command. An unsafe or unowned object is preserved and
-  reported for manual cleanup. Codex branding is declarative manifest metadata and does not edit
-  user configuration.
+  Disable removes only the exact managed command and an exact verified Viventium renderer. An
+  unsafe or unowned object is preserved and reported for manual cleanup. Codex branding is
+  declarative manifest metadata and does not edit user configuration.
 - **Local files disclose prompt content.** Gate files contain keyed identifiers and fixed metadata
   only. State and audit files are user-only. Erase cascades through state, jobs, audit, key, and the
   exact Viventium-owned Claude status presence after explicit confirmation, including a verified

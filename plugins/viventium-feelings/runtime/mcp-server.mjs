@@ -118,7 +118,13 @@ export function createMcpService({ store = createStateStore(), openBrowser, host
       });
       const message = erased.statusPresence?.status === 'cleanup_failed'
         ? 'Feelings data erased. Owned host presence still needs manual removal.'
-        : 'All local Feelings data and owned host presence erased.';
+        : erased.ownedPresenceRemoved
+          ? 'Feelings data and the Viventium Claude status line erased.'
+          : erased.statusPresence?.status === 'conflict'
+            ? 'Feelings data erased. Your custom Claude status line was left unchanged.'
+            : erased.statusPresence?.status === 'native_branding'
+              ? 'Feelings data erased. Codex plugin identity remains until the plugin is removed.'
+              : 'Feelings data erased.';
       return success(erased, message);
     }
     if (name === 'feelings_open_dashboard') {

@@ -400,6 +400,19 @@ elements.resetButton.addEventListener('click', () => confirmAction({
   title: 'Reset Current to Nature?', text: 'All nine live feelings return to their resting values. Your trail remains visible.',
   label: 'Reset Current', run: () => mutate(() => api.reset(state.version), 'Current reset to Nature.'),
 }));
+function eraseMessage(result) {
+  if (result.statusPresence?.status === 'cleanup_failed') {
+    return 'Feelings data erased. Remove V from Claude manually before uninstalling.';
+  }
+  if (result.ownedPresenceRemoved) return 'Feelings data and the Viventium Claude status line erased.';
+  if (result.statusPresence?.status === 'conflict') {
+    return 'Feelings data erased. Your custom Claude status line was left unchanged.';
+  }
+  if (result.statusPresence?.status === 'native_branding') {
+    return 'Feelings data erased. Codex plugin identity remains until the plugin is removed.';
+  }
+  return 'Feelings data erased.';
+}
 elements.eraseButton.addEventListener('click', () => confirmAction({
   title: 'Erase Feelings from this host?', text: 'This permanently removes state, trail, reactions, queue metadata, audit, local keys, and any Viventium-owned Claude status line. Other status lines and host chats are never changed.',
   label: 'Erase everything', dangerous: true,
@@ -407,9 +420,7 @@ elements.eraseButton.addEventListener('click', () => confirmAction({
     onboardingShown = false;
     return mutate(
       () => api.erase(state.version),
-      (result) => result.statusPresence?.status === 'cleanup_failed'
-        ? 'Feelings data erased. Remove V from Claude manually before uninstalling.'
-        : 'Feelings data and owned host presence erased.',
+      eraseMessage,
     ).then(async (saved) => {
       if (saved) await refreshStatusPresence();
       return saved;

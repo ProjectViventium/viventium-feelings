@@ -440,6 +440,8 @@ try {
   await cli('click', '#confirmAction');
   await cli('run-code', 'async (page) => { await page.waitForTimeout(300); }');
   await cli('screenshot', '--filename', 'qa/artifacts/dashboard-browser-qa.png', '--hires');
+  snapshot = await cli('snapshot');
+  if (!/Remove Feelings data and owned host presence/u.test(snapshot)) throw new Error('erase_scope_not_visible');
   await cli('click', '#eraseButton');
   snapshot = await cli('snapshot');
   if (!/Erase Feelings from this host\?/u.test(snapshot)) throw new Error('erase_confirmation_missing');

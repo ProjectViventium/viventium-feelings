@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -76,7 +76,47 @@ test('MCP status presence is explicit, host-aware, and reversible', async (t) =>
   });
   assert.equal(response.result.structuredContent.erased, true);
   assert.equal(response.result.structuredContent.statusPresence.status, 'available');
+  assert.equal(response.result.content[0].text, 'Feelings data and the Viventium Claude status line erased.');
   assert.equal(await store.exists(), false);
+  await service.close();
+});
+
+test('MCP erase reports that a foreign Claude status line was preserved', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'viventium-mcp-test-'));
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-claude-config-'));
+  t.after(() => Promise.all([
+    rm(dir, { recursive: true, force: true }),
+    rm(configDir, { recursive: true, force: true }),
+  ]));
+  const settingsPath = path.join(configDir, 'settings.json');
+  const custom = { statusLine: { type: 'command', command: '~/.claude/custom.sh' } };
+  await writeFile(settingsPath, `${JSON.stringify(custom)}\n`, 'utf8');
+  const store = createStateStore({ dir });
+  const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  const service = createMcpService({ store, openBrowser: async () => {}, host: 'claude', configDir });
+  const response = await service.handle({
+    jsonrpc: '2.0', id: 25, method: 'tools/call',
+    params: { name: 'feelings_erase', arguments: { expectedVersion: enabled.version } },
+  });
+  assert.equal(response.result.structuredContent.statusPresence.status, 'conflict');
+  assert.equal(response.result.content[0].text, 'Feelings data erased. Your custom Claude status line was left unchanged.');
+  assert.deepEqual(JSON.parse(await readFile(settingsPath, 'utf8')), custom);
+  assert.equal(await store.exists(), false);
+  await service.close();
+});
+
+test('MCP erase describes Codex plugin identity without claiming system cleanup', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'viventium-mcp-test-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = createStateStore({ dir });
+  const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  const service = createMcpService({ store, openBrowser: async () => {}, host: 'codex' });
+  const response = await service.handle({
+    jsonrpc: '2.0', id: 26, method: 'tools/call',
+    params: { name: 'feelings_erase', arguments: { expectedVersion: enabled.version } },
+  });
+  assert.equal(response.result.structuredContent.statusPresence.status, 'native_branding');
+  assert.equal(response.result.content[0].text, 'Feelings data erased. Codex plugin identity remains until the plugin is removed.');
   await service.close();
 });
 

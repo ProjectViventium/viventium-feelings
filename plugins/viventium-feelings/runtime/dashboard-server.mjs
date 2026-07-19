@@ -110,6 +110,7 @@ async function serveStatic(request, response, pathname, store) {
 export async function startDashboardServer({
   store = createStateStore(),
   host = 'unknown',
+  statusPresenceConfigDir,
   port = 0,
   idleTimeoutMs = 30 * 60 * 1000,
 } = {}) {
@@ -180,7 +181,11 @@ export async function startDashboardServer({
         return;
       }
       if (url.pathname === '/api/status-presence' && request.method === 'GET') {
-        sendJson(response, 200, await getStatusPresence({ host, stateDir: store.dir }));
+        sendJson(response, 200, await getStatusPresence({
+          host,
+          configDir: statusPresenceConfigDir,
+          stateDir: store.dir,
+        }));
         return;
       }
       const body = await readJson(request);
@@ -193,7 +198,11 @@ export async function startDashboardServer({
         onlyKeys(body, ['action']);
         if (!['enable', 'disable'].includes(body.action)) throw new ValidationError('action_invalid');
         const action = body.action === 'enable' ? enableStatusPresence : disableStatusPresence;
-        sendJson(response, 200, await action({ host, stateDir: store.dir }));
+        sendJson(response, 200, await action({
+          host,
+          configDir: statusPresenceConfigDir,
+          stateDir: store.dir,
+        }));
         return;
       }
       if (url.pathname === '/api/enabled' && request.method === 'PATCH') {
@@ -224,7 +233,31 @@ export async function startDashboardServer({
       }
       if (url.pathname === '/api/state' && request.method === 'DELETE') {
         onlyKeys(body, ['expectedVersion']);
-        sendJson(response, 200, await store.erase(body));
+        const erased = await store.erase(body);
+        let statusPresence;
+        try {
+          statusPresence = await getStatusPresence({
+            host,
+            configDir: statusPresenceConfigDir,
+            stateDir: store.dir,
+          });
+          if (statusPresence.status === 'enabled') {
+            statusPresence = await disableStatusPresence({
+              host,
+              configDir: statusPresenceConfigDir,
+              stateDir: store.dir,
+            });
+          }
+        } catch (error) {
+          statusPresence = {
+            host,
+            status: 'cleanup_failed',
+            canEnable: false,
+            message: 'Feelings data was erased, but owned host presence could not be removed.',
+            error: error instanceof StatusPresenceError ? error.code : 'status_cleanup_failed',
+          };
+        }
+        sendJson(response, 200, { ...erased, statusPresence });
         return;
       }
       sendJson(response, 404, { error: { code: 'not_found' } });

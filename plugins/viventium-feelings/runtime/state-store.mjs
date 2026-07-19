@@ -43,7 +43,10 @@ const DEFAULT_LOCK_WAIT_MS = 4_000;
 const STALE_LOCK_MS = 30_000;
 const MAX_AUDIT_BYTES = 1_000_000;
 const DEFAULT_REACTION_INSTRUCTION =
-  'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.';
+  'React to what genuinely moves Viventium. Let each change match how much the moment matters. Move only the feelings the moment actually touches, and leave nature unchanged.';
+const LEGACY_DEFAULT_REACTION_INSTRUCTIONS = new Set([
+  'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.',
+]);
 
 export class ConflictError extends Error {
   constructor() {
@@ -230,7 +233,10 @@ function validateState(value) {
     return [bandId, band];
   }));
   const rangePromptOverrides = normalizeRangeOverrides(value.rangePromptOverrides, { strict: true });
-  const reactionInstruction = String(value.reactionInstruction ?? '').trim();
+  const storedReactionInstruction = String(value.reactionInstruction ?? '').trim();
+  const reactionInstruction = LEGACY_DEFAULT_REACTION_INSTRUCTIONS.has(storedReactionInstruction)
+    ? DEFAULT_REACTION_INSTRUCTION
+    : storedReactionInstruction;
   if (!reactionInstruction || reactionInstruction.length > 4000) throw new ValidationError('state_invalid');
   if (!['always', 'disabled'].includes(value.reactionActivationMode)) throw new ValidationError('state_invalid');
   if (!['grounded', 'candid', 'warm', 'curious', 'custom'].includes(value.profileId)) {

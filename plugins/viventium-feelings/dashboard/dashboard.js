@@ -270,7 +270,7 @@ async function mutate(action, success, { light = false, rollbackBands = [] } = {
     } else {
       await refresh({ quiet: true });
     }
-    toast(success);
+    toast(typeof success === 'function' ? success(result) : success);
     return true;
   } catch (error) {
     if (state) {
@@ -401,11 +401,19 @@ elements.resetButton.addEventListener('click', () => confirmAction({
   label: 'Reset Current', run: () => mutate(() => api.reset(state.version), 'Current reset to Nature.'),
 }));
 elements.eraseButton.addEventListener('click', () => confirmAction({
-  title: 'Erase all local Feelings data?', text: 'This permanently removes state, trail, reactions, queue metadata, audit, and local keys. Feelings will remain off.',
+  title: 'Erase Feelings from this host?', text: 'This permanently removes state, trail, reactions, queue metadata, audit, local keys, and any Viventium-owned Claude status line. Other status lines and host chats are never changed.',
   label: 'Erase everything', dangerous: true,
   run: () => {
     onboardingShown = false;
-    return mutate(() => api.erase(state.version), 'Local Feelings data erased.');
+    return mutate(
+      () => api.erase(state.version),
+      (result) => result.statusPresence?.status === 'cleanup_failed'
+        ? 'Feelings data erased. Remove V from Claude manually before uninstalling.'
+        : 'Feelings data and owned host presence erased.',
+    ).then(async (saved) => {
+      if (saved) await refreshStatusPresence();
+      return saved;
+    });
   },
 }));
 elements.confirmAction.addEventListener('click', (event) => {

@@ -215,8 +215,10 @@ function minimalEnvironment(tempDir, host) {
     LANG: process.env.LANG ?? 'en_US.UTF-8',
     USER: process.env.USER ?? '',
   };
-  if (process.env.CLAUDE_CONFIG_DIR) environment.CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR;
-  if (process.env.CODEX_HOME) environment.CODEX_HOME = process.env.CODEX_HOME;
+  if (host === 'claude' && process.env.CLAUDE_CONFIG_DIR) {
+    environment.CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR;
+  }
+  if (host === 'codex' && process.env.CODEX_HOME) environment.CODEX_HOME = process.env.CODEX_HOME;
   if (host === 'claude' && process.env.CLAUDE_CODE_OAUTH_TOKEN) {
     environment.CLAUDE_CODE_OAUTH_TOKEN = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   }

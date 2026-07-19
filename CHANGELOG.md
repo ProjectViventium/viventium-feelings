@@ -21,6 +21,8 @@ Versioning once the first public release is tagged.
   preventing the corrected editable default from drifting at the model boundary.
 - Kept every erase outcome visible inside the post-erase disclosure, with host-specific scope and
   confirmation copy for Claude and Codex.
+- Scoped provider config homes to their matching isolated appraiser child: `CLAUDE_CONFIG_DIR` for
+  Claude and `CODEX_HOME` for Codex.
 
 ### Changed
 
@@ -31,7 +33,7 @@ Versioning once the first public release is tagged.
 
 ### Verification
 
-- 106 unit/contract tests pass on the current runtime and exact minimum Node 20.11.1; isolated
+- 107 unit/contract tests pass on the current runtime and exact minimum Node 20.11.1; isolated
   Claude/Codex package lifecycles, real Chromium, both live appraisers, both full reaction
   lifecycles, behavioral steering, and hostile/permission-boundary smokes also pass.
 

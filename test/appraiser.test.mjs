@@ -96,6 +96,17 @@ test('host output parsers accept only final structured appraisals', () => {
 
 test('runner uses empty cwd, minimal env, bounded child, and validated output', async (t) => {
   const state = await stateFixture(t);
+  const inherited = Object.fromEntries(
+    ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']
+      .map((key) => [key, process.env[key]]),
+  );
+  for (const key of Object.keys(inherited)) delete process.env[key];
+  t.after(() => {
+    for (const [key, value] of Object.entries(inherited)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
   let observed;
   const result = await appraiseStimulus({
     stimulus: 'A synthetic success.',
@@ -117,6 +128,56 @@ test('runner uses empty cwd, minimal env, bounded child, and validated output', 
   assert.deepEqual(Object.keys(observed.env).sort(), ['HOME', 'LANG', 'PATH', 'TMPDIR', 'USER']);
   assert.equal(observed.timeoutMs, 90_000);
   assert.equal(observed.maxOutputBytes, 256_000);
+});
+
+test('provider config homes are forwarded only to their matching appraiser host', async (t) => {
+  const state = await stateFixture(t);
+  const previousClaudeConfig = process.env.CLAUDE_CONFIG_DIR;
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CLAUDE_CONFIG_DIR = '/tmp/synthetic-claude-config';
+  process.env.CODEX_HOME = '/tmp/synthetic-codex-home';
+  t.after(() => {
+    if (previousClaudeConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previousClaudeConfig;
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+  });
+
+  let claudeRequest;
+  await appraiseStimulus({
+    stimulus: 'A synthetic success.',
+    state,
+    host: 'claude',
+    runChild: async (request) => {
+      claudeRequest = request;
+      return { stdout: JSON.stringify({ structured_output: {
+        changes: [],
+        innerState: 'I feel steady and present.',
+      } }) };
+    },
+  });
+
+  let codexRequest;
+  await appraiseStimulus({
+    stimulus: 'A synthetic success.',
+    state,
+    host: 'codex',
+    runChild: async (request) => {
+      codexRequest = request;
+      return { stdout: JSON.stringify({
+        type: 'item.completed',
+        item: {
+          type: 'agent_message',
+          text: JSON.stringify({ changes: [], innerState: 'I feel steady and present.' }),
+        },
+      }) };
+    },
+  });
+
+  assert.equal(claudeRequest.env.CLAUDE_CONFIG_DIR, '/tmp/synthetic-claude-config');
+  assert.equal(claudeRequest.env.CODEX_HOME, undefined);
+  assert.equal(codexRequest.env.CODEX_HOME, '/tmp/synthetic-codex-home');
+  assert.equal(codexRequest.env.CLAUDE_CONFIG_DIR, undefined);
 });
 
 test('Claude authentication env is forwarded only to the isolated provider child', async (t) => {

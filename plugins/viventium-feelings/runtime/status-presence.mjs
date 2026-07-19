@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -99,8 +100,15 @@ async function atomicWriteJson(filePath, value, expectedRaw) {
 
 async function withSettingsLock(root, operation) {
   try {
+    const managedDir = path.join(root, MANAGED_DIRECTORY);
+    await mkdir(managedDir, { recursive: true, mode: 0o700 });
+    const details = await lstat(managedDir);
+    if (details.isSymbolicLink() || !details.isDirectory()) {
+      throw new StatusPresenceError('claude_status_directory_invalid');
+    }
+    await chmod(managedDir, 0o700);
     return await withOwnedDirectoryLock({
-      parentDir: path.join(root, MANAGED_DIRECTORY),
+      parentDir: managedDir,
       lockName: SETTINGS_LOCK,
       ownerName: SETTINGS_LOCK_OWNER,
       staleMs: SETTINGS_LOCK_STALE_MS,
@@ -113,6 +121,78 @@ async function withSettingsLock(root, operation) {
     if (error?.message === 'claude_settings_busy') throw new StatusPresenceError('claude_settings_busy');
     throw error;
   }
+}
+
+async function readVerifiedManagedScript(scriptPath) {
+  let handle;
+  try {
+    handle = await open(scriptPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const details = await handle.stat();
+    if (!details.isFile()) throw new StatusPresenceError('claude_status_script_invalid');
+    const content = await handle.readFile('utf8');
+    const current = await lstat(scriptPath);
+    if (!current.isFile() || current.isSymbolicLink()
+        || current.dev !== details.dev || current.ino !== details.ino) {
+      throw new StatusPresenceError('claude_status_script_invalid');
+    }
+    return { content, dev: details.dev, ino: details.ino };
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    if (['ELOOP', 'EMLINK'].includes(error?.code)) {
+      throw new StatusPresenceError('claude_status_script_invalid');
+    }
+    throw error;
+  } finally {
+    await handle?.close().catch(() => {});
+  }
+}
+
+async function assertWritableManagedScript(scriptPath, expectedContent) {
+  const existing = await readVerifiedManagedScript(scriptPath);
+  if (existing && existing.content !== expectedContent) {
+    throw new StatusPresenceError('claude_status_script_unowned');
+  }
+}
+
+async function atomicWriteManagedScript(scriptPath, content) {
+  await assertWritableManagedScript(scriptPath, content);
+  const temporary = `${scriptPath}.${process.pid}.${randomBytes(5).toString('hex')}.tmp`;
+  try {
+    const handle = await open(temporary, 'wx', 0o700);
+    try {
+      await handle.writeFile(content, 'utf8');
+      await handle.chmod(0o700);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await assertWritableManagedScript(scriptPath, content);
+    await rename(temporary, scriptPath);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    if (error instanceof StatusPresenceError) throw error;
+    throw new StatusPresenceError('claude_status_script_invalid');
+  }
+}
+
+async function verifiedOwnedManagedScript(scriptPath, expectedContent) {
+  const script = await readVerifiedManagedScript(scriptPath);
+  if (!script) return null;
+  if (script.content !== expectedContent) {
+    throw new StatusPresenceError('claude_status_script_unowned');
+  }
+  return script;
+}
+
+async function removeVerifiedManagedScript(scriptPath, script) {
+  if (!script) return false;
+  const current = await lstat(scriptPath);
+  if (!current.isFile() || current.isSymbolicLink()
+      || current.dev !== script.dev || current.ino !== script.ino) {
+    throw new StatusPresenceError('claude_status_script_invalid');
+  }
+  await rm(scriptPath, { force: true });
+  return true;
 }
 
 function managedScript(statePath) {
@@ -182,10 +262,7 @@ export async function enableStatusPresence({ host, configDir, stateDir }) {
         && !(settings.statusLine?.type === 'command' && settings.statusLine.command === expectedCommand)) {
       throw new StatusPresenceError('status_line_conflict');
     }
-    await writeFile(scriptPath, managedScript(path.join(path.resolve(stateDir), 'state.json')), {
-      encoding: 'utf8', mode: 0o700,
-    });
-    await chmod(scriptPath, 0o700);
+    await atomicWriteManagedScript(scriptPath, managedScript(path.join(path.resolve(stateDir), 'state.json')));
     try {
       await atomicWriteJson(settingsPath, {
         ...settings,
@@ -196,6 +273,35 @@ export async function enableStatusPresence({ host, configDir, stateDir }) {
       throw error;
     }
     return getStatusPresence({ host, configDir: root, stateDir });
+  });
+}
+
+export async function eraseStatusPresence({ host, configDir, stateDir }) {
+  if (host !== 'claude') {
+    return {
+      ownedPresenceRemoved: false,
+      statusPresence: await getStatusPresence({ host, configDir, stateDir }),
+    };
+  }
+  const { root, settingsPath: configuredSettingsPath, scriptPath } = managedPaths(configDir);
+  return withSettingsLock(root, async () => {
+    const settingsPath = await writableSettingsPath(configuredSettingsPath);
+    const snapshot = await readSettingsSnapshot(settingsPath);
+    const settings = snapshot.value;
+    const expectedCommand = shellCommand(scriptPath);
+    const ownsSetting = settings.statusLine?.type === 'command'
+      && settings.statusLine.command === expectedCommand;
+    const expectedScript = managedScript(path.join(path.resolve(stateDir), 'state.json'));
+    const script = await verifiedOwnedManagedScript(scriptPath, expectedScript);
+    if (ownsSetting) {
+      const { statusLine: _ownedStatusLine, ...rest } = settings;
+      await atomicWriteJson(settingsPath, rest, snapshot.raw);
+    }
+    const ownsScript = await removeVerifiedManagedScript(scriptPath, script);
+    return {
+      ownedPresenceRemoved: ownsSetting || ownsScript,
+      statusPresence: await getStatusPresence({ host, configDir: root, stateDir }),
+    };
   });
 }
 
@@ -211,11 +317,13 @@ export async function disableStatusPresence({ host, configDir, stateDir }) {
         && !(settings.statusLine?.type === 'command' && settings.statusLine.command === expectedCommand)) {
       throw new StatusPresenceError('status_line_conflict');
     }
+    const expectedScript = managedScript(path.join(path.resolve(stateDir), 'state.json'));
+    const script = await verifiedOwnedManagedScript(scriptPath, expectedScript);
     if (settings.statusLine !== undefined) {
       const { statusLine: _ownedStatusLine, ...rest } = settings;
       await atomicWriteJson(settingsPath, rest, snapshot.raw);
     }
-    await rm(scriptPath, { force: true });
+    await removeVerifiedManagedScript(scriptPath, script);
     return getStatusPresence({ host, configDir: root, stateDir });
   });
 }

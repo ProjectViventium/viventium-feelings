@@ -9,7 +9,7 @@
 | DSH-005 | Apply Warm profile | Consequence confirmation appears; all Nature and Current values change | Apply without confirmation |
 | DSH-006 | Edit Reaction Cortex instruction | Count and saved value persist after refresh | More than 4,000 chars or unsafe HTML |
 | DSH-007 | Reset | Confirmation appears; Current returns to Nature; trail remains | Nature changes or trail erased |
-| DSH-008 | Erase | Destructive confirmation; all local state/key/audit/jobs disappear; next read is off | State silently recreated or enabled |
+| DSH-008 | Erase | Destructive confirmation; all local state/key/audit/jobs and exact owned Claude V presence disappear; next read is off | State silently recreated, enabled, stale owned status line, or foreign status line changed |
 | DSH-009 | Concurrent dashboard write | First write wins; stale write gets conflict and refresh guidance | Last-write-wins data loss |
 | DSH-010 | API without token / wrong Origin / wrong Host | `401` / `403` / `421`; no state body | CORS access or token bypass |
 | DSH-011 | Navigate only by keyboard | Logical focus, visible focus ring, operable dialogs and sliders | Focus trap escape or unlabeled action |
@@ -31,3 +31,4 @@
 | DSH-027 | With Now equal to Nature, drag the upper half of the Now dot | Current moves and Nature does not; the Nature halo cannot steal the press | baseline changes when the user grabbed Now |
 | DSH-028 | Press an arrow on Now, then begin a pointer drag before the keyboard debounce expires | Exactly one write commits and the visible value equals persisted state | double write, mid-drag commit, or UI/store divergence |
 | DSH-029 | Keep a profile action focused through a poll, then save a focused advanced field | Focus survives the poll and returns to the equivalent field after the full render | focus falls to body or an unrelated control |
+| DSH-030 | Erase on Claude with owned, orphaned, foreign, or unsafe status presence; erase on Codex | Host-specific scope is visible; owned/verified orphan residue is removed; foreign/unsafe paths survive; exact outcome remains visible after erase; Codex identity is deferred to uninstall | hidden toast, generic overclaim, custom-path deletion, or silent residue |

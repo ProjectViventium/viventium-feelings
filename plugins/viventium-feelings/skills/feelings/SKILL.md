@@ -34,8 +34,9 @@ deterministic control of model behavior.
 - Applying a profile changes all nine Nature values and resets Current. State this before applying.
 - Reset returns Current to Nature but preserves the trail.
 - Pause stops injection and appraisal but preserves local state and decay.
-- Erase is destructive. State exactly what is removed and obtain explicit confirmation before
-  calling `feelings_erase`.
+- Erase is destructive. State that it removes local Feelings data and any exact Viventium-owned
+  Claude status line, then obtain explicit confirmation before calling `feelings_erase`. It never
+  changes another status line or host/provider records.
 - When the user asks for a V/status indicator, call `feelings_get_status_presence`. Codex uses the
   plugin's native V identity in supported composer/directory surfaces. Claude Code can add a
   persistent `V Feelings` status line only as an explicit opt-in.

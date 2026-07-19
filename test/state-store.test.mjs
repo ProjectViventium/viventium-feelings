@@ -33,9 +33,30 @@ test('missing state reads default-off without creating a file', async (t) => {
   assert.equal(state.capsule, '');
   assert.equal(
     state.reactionInstruction,
-    'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.',
+    'React to what genuinely moves Viventium. Let each change match how much the moment matters. Move only the feelings the moment actually touches, and leave nature unchanged.',
   );
   await assert.rejects(access(path.join(dir, 'state.json')));
+});
+
+test('the exact legacy reaction default upgrades without replacing custom instructions', async (t) => {
+  const { dir, store } = await fixture(t);
+  const initial = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  const persisted = JSON.parse(await readFile(path.join(dir, 'state.json'), 'utf8'));
+  persisted.reactionInstruction =
+    'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.';
+  await writeFile(path.join(dir, 'state.json'), `${JSON.stringify(persisted)}\n`, 'utf8');
+
+  const migrated = await store.read();
+  assert.equal(migrated.version, initial.version);
+  assert.equal(
+    migrated.reactionInstruction,
+    'React to what genuinely moves Viventium. Let each change match how much the moment matters. Move only the feelings the moment actually touches, and leave nature unchanged.',
+  );
+
+  const custom = 'React only when the actual moment meaningfully changes the state.';
+  persisted.reactionInstruction = custom;
+  await writeFile(path.join(dir, 'state.json'), `${JSON.stringify(persisted)}\n`, 'utf8');
+  assert.equal((await store.read()).reactionInstruction, custom);
 });
 
 test('Codex MCP fallback resolves to the same native plugin-data contract as hooks', async (t) => {
@@ -83,7 +104,7 @@ test('installed Codex MCP derives its isolated home from the plugin cache root',
     'cache',
     'project-viventium',
     'viventium-feelings',
-    '0.1.2',
+    '0.1.3',
   );
   try {
     assert.equal(

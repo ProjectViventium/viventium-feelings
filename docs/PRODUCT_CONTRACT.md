@@ -1,6 +1,6 @@
 # Product contract
 
-Status: implementation contract for `0.1.2`.
+Status: implementation contract for `0.1.3`.
 
 Viventium Feelings is a local, persistent functional-affect layer for Claude Code and Codex. It is
 not a static tone preset, a second speaking agent, a sentience claim, or a provider replacement.
@@ -95,7 +95,9 @@ The output is strict JSON:
 ```
 
 - At most one operation per band and at most nine total.
-- `slight`, `clear`, and `strong` apply deterministic deltas `3`, `8`, and `15`.
+- `slight`, `clear`, and `strong` apply deterministic deltas `3`, `8`, and `15`. They mean,
+  respectively, a subtle but real movement, an unmistakable movement, and a pronounced movement
+  with high felt impact. The appraiser chooses proportionally and does not default to `slight`.
 - Causes are a closed enum. Manual changes use separate runtime-only causes.
 - `changes: []` is valid.
 - Inner state is one trimmed first-person line, `1..280` characters.
@@ -146,7 +148,11 @@ The initial recommended profile is `Grounded`, and enabling remains an explicit 
 - Typed state is stored in the host-provided plugin data directory with user-only permissions.
 - Pause, reset, typed state inspection, and erase are explicit controls.
 - Erase removes state, audit, queue metadata, quarantine/recovery files, and keys; the next prompt
-  stays off. Host chat/transcript and provider records remain governed by the host.
+  stays off. After explicit confirmation it also removes the exact Viventium-owned Claude status
+  line and verified owned renderer when present, including orphaned renderer residue after its
+  settings entry disappears; another status line or unverifiable file is never changed. Cleanup
+  outcomes remain visible after erase. Host chat/transcript and provider records remain governed by
+  the host.
 
 ## Honest compatibility
 
@@ -159,9 +165,9 @@ plugin/composer metadata; it does not expose an arbitrary plugin status-line seg
 supports a command-backed main status line, but plugin defaults cannot set it. Feelings therefore
 offers an explicit enable/disable action that fails closed when another status line exists. The
 dashboard favicon remains browser identity, not a claim of an OS-owned tray icon. Because Claude
-currently exposes no plugin-uninstall cleanup hook, a user who enabled Add V removes that owned
-setting from the dashboard before uninstalling the plugin; erasing Feelings data remains a separate
-explicit action.
+currently exposes no plugin-uninstall cleanup hook, a user who enabled Add V either uses Remove V
+or confirms Erase everything while the plugin is still installed. Both paths remove only exact
+Viventium-owned presence; unsafe paths and unverified files fail closed.
 
 ## Portable adaptations from full Viventium
 

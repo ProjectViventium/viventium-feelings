@@ -5,6 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 import { ConflictError, ValidationError, createStateStore } from './state-store.mjs';
+import { eraseLocalFeelings } from './erase-local.mjs';
 import {
   StatusPresenceError,
   disableStatusPresence,
@@ -110,6 +111,7 @@ async function serveStatic(request, response, pathname, store) {
 export async function startDashboardServer({
   store = createStateStore(),
   host = 'unknown',
+  statusPresenceConfigDir,
   port = 0,
   idleTimeoutMs = 30 * 60 * 1000,
 } = {}) {
@@ -180,7 +182,11 @@ export async function startDashboardServer({
         return;
       }
       if (url.pathname === '/api/status-presence' && request.method === 'GET') {
-        sendJson(response, 200, await getStatusPresence({ host, stateDir: store.dir }));
+        sendJson(response, 200, await getStatusPresence({
+          host,
+          configDir: statusPresenceConfigDir,
+          stateDir: store.dir,
+        }));
         return;
       }
       const body = await readJson(request);
@@ -193,7 +199,11 @@ export async function startDashboardServer({
         onlyKeys(body, ['action']);
         if (!['enable', 'disable'].includes(body.action)) throw new ValidationError('action_invalid');
         const action = body.action === 'enable' ? enableStatusPresence : disableStatusPresence;
-        sendJson(response, 200, await action({ host, stateDir: store.dir }));
+        sendJson(response, 200, await action({
+          host,
+          configDir: statusPresenceConfigDir,
+          stateDir: store.dir,
+        }));
         return;
       }
       if (url.pathname === '/api/enabled' && request.method === 'PATCH') {
@@ -224,7 +234,12 @@ export async function startDashboardServer({
       }
       if (url.pathname === '/api/state' && request.method === 'DELETE') {
         onlyKeys(body, ['expectedVersion']);
-        sendJson(response, 200, await store.erase(body));
+        sendJson(response, 200, await eraseLocalFeelings({
+          store,
+          expectedVersion: body.expectedVersion,
+          host,
+          configDir: statusPresenceConfigDir,
+        }));
         return;
       }
       sendJson(response, 404, { error: { code: 'not_found' } });

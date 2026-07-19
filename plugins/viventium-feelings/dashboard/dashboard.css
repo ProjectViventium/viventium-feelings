@@ -300,6 +300,7 @@ dialog::backdrop { background: rgba(0,0,0,.5); backdrop-filter: blur(0.25rem); }
 .confirm-shell { display: grid; gap: 1rem; padding: 1.5rem; }
 .confirm-shell h2 { margin: 0.25rem 0 0; font-size: 1.4rem; letter-spacing: -0.02em; }
 .confirm-shell > p:not(.eyebrow) { margin: 0; color: var(--muted); line-height: 1.55; font-size: 0.9rem; }
+.confirm-shell > .onboarding-result { padding: 0.75rem 0.85rem; border: 0.0625rem solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-weight: 600; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
 
 .toast { position: fixed; z-index: 50; right: 1.25rem; bottom: 1.25rem; max-width: min(24rem, calc(100% - 3rem)); padding: 0.8rem 1rem; border: 0.0625rem solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--text); font-size: 0.8125rem; box-shadow: 0 0.75rem 2rem rgba(0,0,0,.25); opacity: 0; transform: translateY(0.75rem); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; }

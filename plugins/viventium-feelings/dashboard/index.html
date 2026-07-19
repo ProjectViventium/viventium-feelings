@@ -105,7 +105,7 @@
               </button>
               <button id="resetButton" class="control-row"><span><strong>Reset Current</strong><small>Return all feelings to Nature</small></span><b>Reset</b></button>
               <button id="pauseButton" class="control-row"><span><strong>Pause Feelings</strong><small>Stop context and reactions; keep state</small></span><b>Pause</b></button>
-              <button id="eraseButton" class="control-row danger"><span><strong>Erase local data</strong><small>Remove state, trail, gates, audit, and key</small></span><b>Erase</b></button>
+              <button id="eraseButton" class="control-row danger"><span><strong>Erase everything</strong><small id="eraseScope">Remove Feelings data from this host</small></span><b>Erase</b></button>
             </div>
           </div>
         </section>
@@ -138,6 +138,7 @@
         <p>Viventium stores typed feeling state, settings, health, and a bounded reaction trail in this host's private plugin-data folder.</p>
         <p>After a completed reply, the newest prompt and current feeling state are sent to an isolated Claude Code or Codex model call. This may use your existing plan quota. Viventium runs no account, analytics, or hosted state service.</p>
         <p>Raw prompts and answers are not written by Feelings. Your host/provider may retain its own records under your account settings. Continue only acknowledges this disclosure—it does not enable the feature.</p>
+        <p id="onboardingResult" class="onboarding-result" role="status" hidden></p>
         <div class="dialog-actions"><button value="default" class="primary-button">I understand</button></div>
       </form>
     </dialog>

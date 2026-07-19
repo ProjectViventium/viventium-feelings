@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -23,7 +23,10 @@ function cli(...args) {
     child.on('error', reject);
     child.on('close', (code) => {
       const output = `${Buffer.concat(stdout).toString('utf8')}\n${Buffer.concat(stderr).toString('utf8')}`;
-      if (code !== 0) return reject(new Error(`playwright_cli_failed:${args[0]}:${output.slice(0, 800)}`));
+      const reportedError = /(?:^|\n)### Error(?:\s|$)/u.test(output);
+      if (code !== 0 || reportedError) {
+        return reject(new Error(`playwright_cli_failed:${args[0]}:${output.slice(0, 800)}`));
+      }
       resolve(output);
     });
   });
@@ -109,10 +112,13 @@ try {
 
   // The Claude-specific status presence is an explicit one-click action and
   // the same control removes only the managed setting.
-  const priorClaudeConfig = process.env.CLAUDE_CONFIG_DIR;
   const claudeConfigDir = path.join(dir, 'synthetic-claude-config');
-  process.env.CLAUDE_CONFIG_DIR = claudeConfigDir;
-  const claudeDashboard = await startDashboardServer({ store, host: 'claude', idleTimeoutMs: 0 });
+  const claudeStateDir = path.join(dir, 'synthetic-claude-state');
+  const claudeStore = createStateStore({ dir: claudeStateDir });
+  await claudeStore.setEnabled({ expectedVersion: 0, enabled: true });
+  const claudeDashboard = await startDashboardServer({
+    store: claudeStore, host: 'claude', statusPresenceConfigDir: claudeConfigDir, idleTimeoutMs: 0,
+  });
   try {
     await cli('run-code', `async (page) => {
       await page.goto(${JSON.stringify(claudeDashboard.url)});
@@ -127,21 +133,98 @@ try {
       throw new Error('claude_status_presence_not_installed');
     }
     await access(path.join(claudeConfigDir, 'viventium-feelings', 'statusline.mjs'));
+    await cli('click', '#eraseButton');
+    snapshot = await cli('snapshot');
+    if (!/Viventium-owned Claude status line and renderer are also removed/u.test(snapshot)) {
+      throw new Error('claude_erase_confirmation_scope_missing');
+    }
+    await cli('click', '#confirmAction');
     await cli('run-code', `async (page) => {
-      await page.locator('#hostPresenceButton').click();
-      await page.waitForFunction(() => document.querySelector('#hostPresenceLabel')?.textContent === 'Add V');
+      await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
+        && document.querySelector('#onboardingResult')?.textContent.includes('Viventium-owned Claude status presence erased'));
     }`);
+    snapshot = await cli('snapshot');
+    if (!/Feelings data and Viventium-owned Claude status presence erased/u.test(snapshot)) {
+      throw new Error('owned_erase_result_not_visible');
+    }
     if (Object.hasOwn(JSON.parse(await readFile(path.join(claudeConfigDir, 'settings.json'), 'utf8')), 'statusLine')) {
       throw new Error('claude_status_presence_not_removed');
     }
+    let scriptExists = true;
+    await access(path.join(claudeConfigDir, 'viventium-feelings', 'statusline.mjs')).catch(() => { scriptExists = false; });
+    if (scriptExists) throw new Error('claude_status_script_not_removed_by_erase');
+    if (await claudeStore.exists()) throw new Error('claude_owned_erase_left_state');
   } finally {
     await claudeDashboard.close();
-    if (priorClaudeConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
-    else process.env.CLAUDE_CONFIG_DIR = priorClaudeConfig;
+  }
+
+  // A replacement custom line is preserved and that outcome remains visible
+  // inside the post-erase disclosure dialog rather than behind it.
+  const customConfigDir = path.join(dir, 'synthetic-custom-claude-config');
+  const customStore = createStateStore({ dir: path.join(dir, 'synthetic-custom-claude-state') });
+  const customStatus = { statusLine: { type: 'command', command: '~/.claude/custom.sh' } };
+  await customStore.setEnabled({ expectedVersion: 0, enabled: true });
+  await mkdir(customConfigDir, { recursive: true });
+  await writeFile(path.join(customConfigDir, 'settings.json'), `${JSON.stringify(customStatus)}\n`, 'utf8');
+  const customDashboard = await startDashboardServer({
+    store: customStore, host: 'claude', statusPresenceConfigDir: customConfigDir, idleTimeoutMs: 0,
+  });
+  try {
+    await cli('run-code', `async (page) => { await page.goto(${JSON.stringify(customDashboard.url)}); }`);
+    await cli('run-code', `async (page) => {
+      await page.waitForFunction(() => document.querySelector('#hostPresenceLabel')?.textContent === 'Already used');
+    }`);
+    await cli('click', 'a[href="#settings"]');
+    await cli('click', '#eraseButton');
+    await cli('click', '#confirmAction');
+    await cli('run-code', `async (page) => {
+      await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
+        && document.querySelector('#onboardingResult')?.textContent.includes('custom Claude status line was left unchanged'));
+      if (!await page.locator('#onboardingResult').isVisible()) throw new Error('custom_status_result_not_visible');
+    }`);
+    if (JSON.parse(await readFile(path.join(customConfigDir, 'settings.json'), 'utf8')).statusLine.command !== '~/.claude/custom.sh') {
+      throw new Error('custom_status_changed_by_erase');
+    }
+    if (await customStore.exists()) {
+      const unexpected = await customStore.read();
+      throw new Error(`custom_erase_left_state:v${unexpected.version}:enabled=${unexpected.enabled}`);
+    }
+  } finally {
+    await customDashboard.close();
+  }
+
+  // Unsafe managed-directory residue fails closed after data erasure, and the
+  // manual-cleanup guidance is visible in the disclosure dialog.
+  const unsafeConfigDir = path.join(dir, 'synthetic-unsafe-claude-config');
+  const unsafeStore = createStateStore({ dir: path.join(dir, 'synthetic-unsafe-claude-state') });
+  const unsafeTarget = path.join(dir, 'synthetic-unsafe-status-target');
+  await unsafeStore.setEnabled({ expectedVersion: 0, enabled: true });
+  await mkdir(unsafeConfigDir, { recursive: true });
+  await mkdir(unsafeTarget);
+  await symlink(unsafeTarget, path.join(unsafeConfigDir, 'viventium-feelings'));
+  const unsafeDashboard = await startDashboardServer({
+    store: unsafeStore, host: 'claude', statusPresenceConfigDir: unsafeConfigDir, idleTimeoutMs: 0,
+  });
+  try {
+    await cli('run-code', `async (page) => { await page.goto(${JSON.stringify(unsafeDashboard.url)}); }`);
+    await cli('run-code', `async (page) => {
+      await page.waitForFunction(() => document.querySelector('#hostPresenceLabel')?.textContent === 'Add V');
+    }`);
+    await cli('click', 'a[href="#settings"]');
+    await cli('click', '#eraseButton');
+    await cli('click', '#confirmAction');
+    await cli('run-code', `async (page) => {
+      await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
+        && document.querySelector('#onboardingResult')?.textContent.includes('Remove V from Claude manually'));
+      if (!await page.locator('#onboardingResult').isVisible()) throw new Error('partial_cleanup_result_not_visible');
+    }`);
+    if (await unsafeStore.exists()) throw new Error('partial_cleanup_undid_data_erase');
+  } finally {
+    await unsafeDashboard.close();
   }
   await cli('run-code', `async (page) => { await page.goto(${JSON.stringify(dashboard.url)}); await page.waitForTimeout(250); }`);
   await cli('run-code', `async (page) => {
-    const reading = (await page.locator('.band[data-band="curiosity"] .band-reading b').textContent()).trim();
+    const reading = (await page.locator('.band[data-band="curiosity"] [data-value="current"]').textContent()).trim();
     if (reading !== '74') throw new Error('curiosity_reaction_value:' + reading);
   }`);
   await store.recordReactionHealth({
@@ -162,7 +245,7 @@ try {
   clock = new Date('2026-07-18T12:45:00.000Z');
   await cli('run-code', 'async (page) => { await page.waitForTimeout(2300); }');
   await cli('run-code', `async (page) => {
-    const reading = (await page.locator('.band[data-band="curiosity"] .band-reading b').textContent()).trim();
+    const reading = (await page.locator('.band[data-band="curiosity"] [data-value="current"]').textContent()).trim();
     if (reading !== '70') throw new Error('live_decay_not_rendered_without_version_change:' + reading);
   }`);
   await cli('run-code', `async (page) => {
@@ -405,7 +488,7 @@ try {
   await cli('click', 'button:has-text("Apply Warm")');
   await cli('run-code', `async (page) => {
     await page.waitForTimeout(300);
-    const care = (await page.locator('.band[data-band="care"] .band-reading b').textContent()).trim();
+    const care = (await page.locator('.band[data-band="care"] [data-value="current"]').textContent()).trim();
     if (care !== '86') throw new Error('profile_not_applied:care=' + care);
   }`);
   await cli('click', '#powerToggle');
@@ -438,16 +521,28 @@ try {
   snapshot = await cli('snapshot');
   if (!/Reset Current to Nature\?/u.test(snapshot)) throw new Error('reset_confirmation_missing');
   await cli('click', '#confirmAction');
-  await cli('run-code', 'async (page) => { await page.waitForTimeout(300); }');
   await cli('screenshot', '--filename', 'qa/artifacts/dashboard-browser-qa.png', '--hires');
+  snapshot = await cli('snapshot');
+  if (!/Remove Feelings data; Codex identity remains until plugin removal/u.test(snapshot)) {
+    throw new Error('codex_erase_scope_not_visible');
+  }
   await cli('click', '#eraseButton');
   snapshot = await cli('snapshot');
-  if (!/Erase all local Feelings data\?/u.test(snapshot)) throw new Error('erase_confirmation_missing');
+  if (!/Erase Feelings from this host\?/u.test(snapshot)) throw new Error('erase_confirmation_missing');
+  if (!/Codex plugin identity remains until the plugin is removed/u.test(snapshot)) {
+    throw new Error('codex_erase_confirmation_scope_missing');
+  }
   await cli('click', '#confirmAction');
-  await cli('run-code', 'async (page) => { await page.waitForTimeout(300); }');
+  await cli('run-code', `async (page) => {
+    await page.waitForFunction(() => document.querySelector('#onboardingDialog')?.open
+      && document.querySelector('#onboardingResult')?.textContent.includes('Codex plugin identity remains'));
+  }`);
   snapshot = await cli('snapshot');
   if (!/Before you turn it on|Your feelings stay local/u.test(snapshot)) {
     throw new Error('erase_did_not_restore_onboarding_disclosure');
+  }
+  if (!/Feelings data erased\. Codex plugin identity remains until the plugin is removed/u.test(snapshot)) {
+    throw new Error('codex_erase_result_not_visible');
   }
   const erased = await store.read();
   if (erased.enabled || erased.version !== 0 || erased.trail.length !== 0) throw new Error('erase_state_not_default_off');

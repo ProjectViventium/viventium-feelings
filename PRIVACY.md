@@ -42,12 +42,13 @@ the fragment from the address and browser history.
 - **Pause** keeps state but stops context injection and appraisal.
 - **Reset** returns Current to Nature and keeps the trail.
 - **Erase** deletes state, trail, audit, completion gates, quarantine/recovery files, dashboard
-  metadata, and local keys. It cannot erase the host's own chat/transcript or provider records.
+  metadata, local keys, and the exact Viventium-owned Claude status line when present. It cannot
+  erase the host's own chat/transcript or provider records and never changes another status line.
 
 The optional Claude Code status-line action is a separate explicit host-setting change. Enabling it
 adds a Viventium-owned command to Claude's `settings.json` and a local renderer under the Claude
-config directory. It refuses to overwrite another status line. Use **Remove** (or ask the plugin to
-remove its status presence) to delete that exact command; emotional-state Erase does not silently
-rewrite host settings.
+config directory. It refuses to overwrite another status line. **Remove** deletes that exact command
+while preserving Feelings data. **Erase everything** discloses and removes both local Feelings data
+and that owned command; it never rewrites a foreign status line.
 
 Claude Code and Codex use separate host-provided plugin data directories. No automatic sync occurs.

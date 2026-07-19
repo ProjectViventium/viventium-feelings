@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { startDashboardServer } from '../plugins/viventium-feelings/runtime/dashboard-server.mjs';
 import { createStateStore } from '../plugins/viventium-feelings/runtime/state-store.mjs';
+import { enableStatusPresence } from '../plugins/viventium-feelings/runtime/status-presence.mjs';
 
 async function fixture(t) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'viventium-dashboard-test-'));
@@ -229,6 +230,43 @@ test('versioned controls enable, tune, apply profile, reset, and erase', async (
   response = await request('/api/state', 'DELETE', { expectedVersion: state.version });
   assert.equal(response.status, 200);
   assert.equal(await store.exists(), false);
+});
+
+test('erase removes an explicitly enabled Viventium-owned Claude status line', async (t) => {
+  const stateDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-dashboard-erase-state-'));
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-dashboard-erase-config-'));
+  const store = createStateStore({ dir: stateDir });
+  const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  await enableStatusPresence({ host: 'claude', configDir, stateDir });
+  const dashboard = await startDashboardServer({
+    store,
+    host: 'claude',
+    statusPresenceConfigDir: configDir,
+    idleTimeoutMs: 0,
+  });
+  t.after(async () => {
+    await dashboard.close();
+    await Promise.all([
+      rm(stateDir, { recursive: true, force: true }),
+      rm(configDir, { recursive: true, force: true }),
+    ]);
+  });
+
+  const response = await fetch(`${dashboard.origin}/api/state`, {
+    method: 'DELETE',
+    headers: {
+      authorization: `Bearer ${dashboard.token}`,
+      origin: dashboard.origin,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ expectedVersion: enabled.version }),
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.erased, true);
+  assert.equal(result.statusPresence.status, 'available');
+  assert.equal(await store.exists(), false);
+  assert.equal(JSON.parse(await readFile(path.join(configDir, 'settings.json'), 'utf8')).statusLine, undefined);
 });
 
 test('dashboard renderer never injects state through HTML parsing sinks', async () => {

@@ -50,13 +50,17 @@ control assets.
   owner-claimed lock serializes plugin writers; a compare-before-rename check rejects external
   changes; and valid settings symlinks are edited through their resolved targets instead of being
   replaced. The command imports a base64-encoded absolute script path as data, so shell
-  metacharacters in the config path cannot become shell syntax. Disable removes only the exact
-  managed command. Codex branding is declarative manifest metadata and does not edit user
-  configuration.
+  metacharacters in the config path cannot become shell syntax. The plugin refuses a symlinked
+  managed directory or renderer, writes its renderer through a synced temporary file, and verifies
+  exact deterministic contents plus inode identity before treating an orphaned renderer as owned.
+  Disable removes only the exact managed command. An unsafe or unowned object is preserved and
+  reported for manual cleanup. Codex branding is declarative manifest metadata and does not edit
+  user configuration.
 - **Local files disclose prompt content.** Gate files contain keyed identifiers and fixed metadata
   only. State and audit files are user-only. Erase cascades through state, jobs, audit, key, and the
-  exact Viventium-owned Claude status presence after explicit confirmation. Cleanup refuses foreign
-  status lines and reports a partial cleanup without undoing data erasure.
+  exact Viventium-owned Claude status presence after explicit confirmation, including a verified
+  orphaned renderer whose settings entry disappeared. Cleanup refuses foreign or unverifiable
+  objects and reports a visible partial cleanup without undoing data erasure.
 - **Unbounded cost or denial of service.** Hook input, stimulus, capsule UTF-8 bytes, HTTP body,
   child output, model time, active appraisal count, pending queue, audit, trail, ledger, and job age
   are capped. A retry cannot create a second paid call. The visible response never waits for appraisal.

@@ -7,7 +7,7 @@ const elements = Object.fromEntries([
   'reactionInstruction', 'instructionCount', 'saveInstruction', 'resetButton', 'pauseButton',
   'eraseButton', 'confirmDialog', 'confirmTitle', 'confirmText', 'confirmAction', 'toast',
   'onboardingDialog', 'themeToggle', 'themeColor', 'hostPresenceButton', 'hostPresenceTitle',
-  'hostPresenceHelp', 'hostPresenceLabel',
+  'hostPresenceHelp', 'hostPresenceLabel', 'eraseScope', 'onboardingResult',
 ].map((id) => [id, document.getElementById(id)]));
 
 let state;
@@ -152,6 +152,11 @@ function syncInspector() {
   const hostName = host === 'claude' ? 'Claude Code' : host === 'codex' ? 'Codex' : 'Local';
   elements.activeHost.textContent = hostName;
   elements.hostBadge.textContent = hostName;
+  elements.eraseScope.textContent = host === 'claude'
+    ? 'Remove Feelings data and Viventium-owned Claude status presence'
+    : host === 'codex'
+      ? 'Remove Feelings data; Codex identity remains until plugin removal'
+      : 'Remove Feelings data from this host';
   elements.powerToggle.checked = state.enabled;
   elements.powerLabel.textContent = state.enabled ? 'On' : 'Off';
   elements.pauseButton.querySelector('b').textContent = state.enabled ? 'Pause' : 'Resume';
@@ -261,16 +266,19 @@ async function refresh({ quiet = false, force = false, forceBands = [] } = {}) {
   }
 }
 
-async function mutate(action, success, { light = false, rollbackBands = [] } = {}) {
+async function mutate(action, success, {
+  light = false, rollbackBands = [], prepareSuccess, announceSuccess = true,
+} = {}) {
   try {
     const result = await action();
+    prepareSuccess?.(result);
     if (result.state) {
       if (light && elements.bands.querySelector('.band')) lightUpdate(result.state);
       else render(result.state);
     } else {
       await refresh({ quiet: true });
     }
-    toast(typeof success === 'function' ? success(result) : success);
+    if (announceSuccess) toast(typeof success === 'function' ? success(result) : success);
     return true;
   } catch (error) {
     if (state) {
@@ -404,25 +412,50 @@ function eraseMessage(result) {
   if (result.statusPresence?.status === 'cleanup_failed') {
     return 'Feelings data erased. Remove V from Claude manually before uninstalling.';
   }
-  if (result.ownedPresenceRemoved) return 'Feelings data and the Viventium Claude status line erased.';
+  if (result.statusPresence?.status === 'conflict' && result.ownedPresenceRemoved) {
+    return 'Feelings data and orphaned Viventium status residue erased. Your custom Claude status line was left unchanged.';
+  }
   if (result.statusPresence?.status === 'conflict') {
     return 'Feelings data erased. Your custom Claude status line was left unchanged.';
   }
+  if (result.ownedPresenceRemoved) return 'Feelings data and Viventium-owned Claude status presence erased.';
   if (result.statusPresence?.status === 'native_branding') {
     return 'Feelings data erased. Codex plugin identity remains until the plugin is removed.';
   }
   return 'Feelings data erased.';
 }
+function eraseConfirmationText() {
+  const localScope = 'This permanently removes state, trail, reactions, queue metadata, audit, and local keys.';
+  if (host === 'claude') {
+    return `${localScope} An exact Viventium-owned Claude status line and renderer are also removed. Other status lines and host chats are never changed.`;
+  }
+  if (host === 'codex') {
+    return `${localScope} Codex plugin identity remains until the plugin is removed. Host chats are never changed.`;
+  }
+  return `${localScope} Host chats are never changed.`;
+}
 elements.eraseButton.addEventListener('click', () => confirmAction({
-  title: 'Erase Feelings from this host?', text: 'This permanently removes state, trail, reactions, queue metadata, audit, local keys, and any Viventium-owned Claude status line. Other status lines and host chats are never changed.',
+  title: 'Erase Feelings from this host?', text: eraseConfirmationText(),
   label: 'Erase everything', dangerous: true,
   run: () => {
+    elements.onboardingResult.hidden = true;
     onboardingShown = false;
     return mutate(
       () => api.erase(state.version),
       eraseMessage,
+      {
+        announceSuccess: false,
+        prepareSuccess: (result) => {
+          elements.onboardingResult.textContent = eraseMessage(result);
+          elements.onboardingResult.hidden = false;
+        },
+      },
     ).then(async (saved) => {
-      if (saved) await refreshStatusPresence();
+      if (saved) {
+        await refreshStatusPresence();
+        onboardingShown = true;
+        if (!elements.onboardingDialog.open) elements.onboardingDialog.showModal();
+      }
       return saved;
     });
   },

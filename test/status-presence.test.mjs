@@ -214,6 +214,45 @@ test('Claude status presence refuses a dangling settings symlink without replaci
   assert.equal((await lstat(settingsPath)).isSymbolicLink(), true);
 });
 
+test('Claude status presence refuses a managed-script symlink without touching its target', async (t) => {
+  const stateDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-state-'));
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-config-'));
+  const targetDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-target-'));
+  t.after(() => Promise.all([
+    rm(stateDir, { recursive: true, force: true }),
+    rm(configDir, { recursive: true, force: true }),
+    rm(targetDir, { recursive: true, force: true }),
+  ]));
+  const managedDir = path.join(configDir, 'viventium-feelings');
+  const target = path.join(targetDir, 'unrelated.mjs');
+  await mkdir(managedDir, { mode: 0o700 });
+  await writeFile(target, 'DO NOT TOUCH\n', 'utf8');
+  await symlink(target, path.join(managedDir, 'statusline.mjs'));
+  await assert.rejects(
+    enableStatusPresence({ host: 'claude', configDir, stateDir }),
+    (error) => error instanceof StatusPresenceError && error.code === 'claude_status_script_invalid',
+  );
+  assert.equal(await readFile(target, 'utf8'), 'DO NOT TOUCH\n');
+  assert.equal((await lstat(path.join(managedDir, 'statusline.mjs'))).isSymbolicLink(), true);
+});
+
+test('Claude status presence refuses a symlinked managed directory', async (t) => {
+  const stateDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-state-'));
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-config-'));
+  const targetDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-status-target-'));
+  t.after(() => Promise.all([
+    rm(stateDir, { recursive: true, force: true }),
+    rm(configDir, { recursive: true, force: true }),
+    rm(targetDir, { recursive: true, force: true }),
+  ]));
+  await symlink(targetDir, path.join(configDir, 'viventium-feelings'));
+  await assert.rejects(
+    enableStatusPresence({ host: 'claude', configDir, stateDir }),
+    (error) => error instanceof StatusPresenceError && error.code === 'claude_status_directory_invalid',
+  );
+  assert.deepEqual(await readdir(targetDir), []);
+});
+
 test('Codex reports native plugin branding and rejects Claude-only status mutation', async () => {
   const presence = await getStatusPresence({ host: 'codex', stateDir: '/synthetic' });
   assert.equal(presence.status, 'native_branding');

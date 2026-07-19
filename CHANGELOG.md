@@ -14,6 +14,11 @@ Versioning once the first public release is tagged.
 - Made **Erase everything** remove an explicitly installed Viventium-owned Claude status line from
   both dashboard and MCP erase flows. Foreign status lines remain untouched, and partial cleanup is
   reported without undoing the completed data erasure.
+- Hardened Claude status presence against managed-directory and renderer-path symlinks. Add V now
+  refuses unsafe or unowned paths; erase removes orphaned renderer residue only when its exact
+  deterministic contents prove Viventium ownership.
+- Kept every erase outcome visible inside the post-erase disclosure, with host-specific scope and
+  confirmation copy for Claude and Codex.
 
 ### Changed
 
@@ -24,7 +29,7 @@ Versioning once the first public release is tagged.
 
 ### Verification
 
-- 100 unit/contract tests pass on the current runtime and exact minimum Node 20.11.1; isolated
+- 105 unit/contract tests pass on the current runtime and exact minimum Node 20.11.1; isolated
   Claude/Codex package lifecycles, real Chromium, both live appraisers, both full reaction
   lifecycles, behavioral steering, and hostile/permission-boundary smokes also pass.
 

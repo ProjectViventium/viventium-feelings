@@ -1,6 +1,6 @@
 import {
   StatusPresenceError,
-  disableStatusPresence,
+  eraseStatusPresence,
   getStatusPresence,
 } from './status-presence.mjs';
 
@@ -9,10 +9,12 @@ export async function eraseLocalFeelings({ store, expectedVersion, host, configD
   let statusPresence;
   let ownedPresenceRemoved = false;
   try {
-    statusPresence = await getStatusPresence({ host, configDir, stateDir: store.dir });
-    if (statusPresence.status === 'enabled') {
-      statusPresence = await disableStatusPresence({ host, configDir, stateDir: store.dir });
-      ownedPresenceRemoved = true;
+    if (host === 'claude') {
+      ({ statusPresence, ownedPresenceRemoved } = await eraseStatusPresence({
+        host, configDir, stateDir: store.dir,
+      }));
+    } else {
+      statusPresence = await getStatusPresence({ host, configDir, stateDir: store.dir });
     }
   } catch (error) {
     statusPresence = {

@@ -23,4 +23,4 @@
 | RCT-019 | Host Stop has no submission identifier while multiple session jobs wait | Oldest matching job is released FIFO | newer prompt released for older reply |
 | RCT-020 | Reply completes between 2 and 30 minutes | Completion gate remains alive and reacts once; after 30 minutes it safely skips | normal long agent turn mislabeled as provider failure |
 | RCT-021 | Completion-gate filesystem operation throws unexpectedly | Worker records a fixed public-safe coordination code and clears its gate | crash, leaked filesystem prose, or 30-minute stale metadata |
-| RCT-022 | Several writers concurrently encounter one abandoned lock | Ownership token and inode verification permit safe reclaim; a new live owner is never deleted | two writers, lost lock, or lock timeout from recovery race |
+| RCT-022 | Several writers concurrently encounter one abandoned lock, including an abandoned reclaim claim | One exclusive reclaim claimant plus owner token/inode verification permit recovery; a delayed contender never moves a replacement owner | two writers, lost lock, orphan claim, or lock timeout from recovery race |

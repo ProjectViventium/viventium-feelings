@@ -1,6 +1,6 @@
 {
   "name": "viventium-feelings",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Persistent local emotional state for Claude Code and Codex.",
   "type": "module",

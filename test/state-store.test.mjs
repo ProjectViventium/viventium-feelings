@@ -79,7 +79,7 @@ test('installed Codex MCP derives its isolated home from the plugin cache root',
     'cache',
     'project-viventium',
     'viventium-feelings',
-    '0.1.0',
+    '0.1.1',
   );
   try {
     assert.equal(
@@ -151,11 +151,13 @@ test('erase is durable across the next read and a new store instance', async (t)
   const { dir, store } = await fixture(t);
   const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
   await eventIdFor({ session_id: 'synthetic-session', prompt_id: 'synthetic-prompt' }, { dir });
+  await mkdir(path.join(dir, '.state.lock.release.synthetic'), { mode: 0o700 });
   await store.erase({ expectedVersion: enabled.version });
   assert.equal((await store.read()).enabled, false);
   assert.equal((await createStateStore({ dir }).read()).enabled, false);
   await assert.rejects(access(path.join(dir, 'state.json')));
   await assert.rejects(access(path.join(dir, '.event-key')));
+  await assert.rejects(access(path.join(dir, '.state.lock.release.synthetic')));
 });
 
 test('off state still decays on read but remains absent from prompt context', async (t) => {
@@ -281,20 +283,33 @@ test('manual state changes clear stale Inner state and append bounded typed trai
   assert.doesNotMatch(persisted, /I want to tend this carefully/u);
 });
 
-test('atomic stale-lock reclamation permits only one expected-version writer', async (t) => {
+test('state writers recover a fresh crashed claim and permit one expected-version writer', async (t) => {
   const { dir } = await fixture(t);
-  await mkdir(path.join(dir, '.state.lock'));
+  const lock = path.join(dir, '.state.lock');
+  await mkdir(lock);
+  await writeFile(path.join(lock, 'owner.json'), `${JSON.stringify({
+    pid: 2_147_483_647,
+    token: 'stale-owner',
+  })}\n`, { mode: 0o600 });
+  await writeFile(path.join(lock, '.reclaim.json'), `${JSON.stringify({
+    pid: 2_147_483_647,
+    token: 'stale-reclaimer',
+  })}\n`, { mode: 0o600 });
   const stale = new Date(Date.now() - 60_000);
-  await utimes(path.join(dir, '.state.lock'), stale, stale);
-  const first = createStateStore({ dir });
-  const second = createStateStore({ dir });
-  const results = await Promise.allSettled([
-    first.setEnabled({ expectedVersion: 0, enabled: true }),
-    second.setEnabled({ expectedVersion: 0, enabled: false }),
-  ]);
+  await utimes(lock, stale, stale);
+  for (const name of ['.state.lock.stale.synthetic', '.state.lock.release.synthetic']) {
+    const tombstone = path.join(dir, name);
+    await mkdir(tombstone, { mode: 0o700 });
+    await utimes(tombstone, stale, stale);
+  }
+  const stores = Array.from({ length: 8 }, () => createStateStore({ dir }));
+  const results = await Promise.allSettled(stores.map((store, index) => (
+    store.setEnabled({ expectedVersion: 0, enabled: index % 2 === 0 })
+  )));
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
-  assert.equal(results.filter((result) => result.status === 'rejected' && result.reason instanceof ConflictError).length, 1);
-  assert.equal((await first.read()).version, 1);
+  assert.equal(results.filter((result) => result.status === 'rejected' && result.reason instanceof ConflictError).length, 7);
+  assert.equal((await stores[0].read()).version, 1);
+  assert.equal((await readdir(dir)).some((name) => name.startsWith('.state.lock')), false);
 });
 
 test('a stale-looking lock owned by a live process is never reclaimed', async (t) => {
@@ -310,6 +325,29 @@ test('a stale-looking lock owned by a live process is never reclaimed', async (t
     /state_lock_timeout/u,
   );
   assert.equal(JSON.parse(await readFile(path.join(lock, 'owner.json'), 'utf8')).pid, process.pid);
+});
+
+test('a fresh reclaim claim owned by a live process is never cleared', async (t) => {
+  const { dir } = await fixture(t);
+  const lock = path.join(dir, '.state.lock');
+  await mkdir(lock);
+  await writeFile(path.join(lock, 'owner.json'), `${JSON.stringify({
+    pid: 2_147_483_647,
+    token: 'stale-owner',
+  })}\n`, { mode: 0o600 });
+  const claim = path.join(lock, '.reclaim.json');
+  await writeFile(claim, `${JSON.stringify({
+    pid: process.pid,
+    token: 'live-reclaimer',
+  })}\n`, { mode: 0o600 });
+  const stale = new Date(Date.now() - 60_000);
+  await utimes(lock, stale, stale);
+  const store = createStateStore({ dir, lockWaitMs: 60 });
+  await assert.rejects(
+    store.setEnabled({ expectedVersion: 0, enabled: true }),
+    /state_lock_timeout/u,
+  );
+  assert.equal(JSON.parse(await readFile(claim, 'utf8')).token, 'live-reclaimer');
 });
 
 test('capsule limit rejects an oversized future range before persistence', async (t) => {

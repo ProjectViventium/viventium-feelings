@@ -1,6 +1,6 @@
 # Threat model
 
-Status: release-gate model for `0.1.0`.
+Status: release-gate model for `0.1.1`.
 
 ## Trust boundaries and assets
 
@@ -31,10 +31,12 @@ control assets.
 - **Concurrent reactions lose or duplicate updates.** A four-entry metadata-only queue preserves
   distinct overlapping turns while only completion-signalled jobs contend for one active appraisal
   slot. Keyed event IDs deduplicate retries. A PID-aware process lock, rebase, version counter, and
-  bounded HMAC event ledger serialize commits. Lock release requires a random owner token; stale
-  reclaim verifies owner liveness, token, and inode before and after the atomic tombstone rename. A
-  live state lock is never reclaimed solely because it looks old; pending gates expire after the
-  30-minute in-memory completion window.
+  bounded HMAC event ledger serialize commits. Queue and state writes share one owner-claimed
+  directory lock. Exactly one contender can claim stale recovery; it verifies owner liveness,
+  token, and inode before and after an atomic tombstone rename. Release also moves only the verified
+  owner's directory to a unique tombstone before deletion. A crashed reclaim claim is itself
+  recoverable, and a live lock is never reclaimed solely because it looks old. Pending gates expire
+  after the 30-minute in-memory completion window.
 - **Reaction coordination strips the foreground feeling context.** The prompt hook builds the
   capsule first and fail-opens only the optional gate/worker path, so key, queue, or launch failures
   cannot remove the already-built capsule from the current turn.

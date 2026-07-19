@@ -1,6 +1,6 @@
 # Product contract
 
-Status: implementation contract for `0.1.0`.
+Status: implementation contract for `0.1.1`.
 
 Viventium Feelings is a local, persistent functional-affect layer for Claude Code and Codex. It is
 not a static tone preset, a second speaking agent, a sentience claim, or a provider replacement.
@@ -150,7 +150,7 @@ The initial recommended profile is `Grounded`, and enabling remains an explicit 
 
 ## Honest compatibility
 
-Automatic Feelings requires local plugin hooks. `0.1.0` targets Claude Code and local Codex. It does
+Automatic Feelings requires local plugin hooks. `0.1.x` targets Claude Code and local Codex. It does
 not govern ordinary Claude Chat or ChatGPT Chat. A future hosted ChatGPT app would be a separate
 remote product with separate state, authentication, privacy, and appraisal cost.
 
@@ -160,7 +160,7 @@ This lightweight plugin preserves the nine-band state, five ranges, Nature/Curre
 capsule, typed `3 / 8 / 15` reactions, causes, trail, Inner state, and future-turn causality. It
 intentionally adapts the surrounding full-platform runtime:
 
-- `0.1.0` supports `always` and `disabled` reaction modes; it does not run Viventium's separate
+- `0.1.x` supports `always` and `disabled` reaction modes; it does not run Viventium's separate
   activation classifier.
 - Appraisal is one bounded native-host attempt with no cross-provider fallback or automatic retry.
 - Appraiser context is the materialized state, Nature, enabled flags, half-lives, last ten typed

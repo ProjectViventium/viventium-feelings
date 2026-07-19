@@ -1,6 +1,6 @@
 {
   "name": "viventium-feelings",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Persistent local emotional state and a live feelings dashboard for Claude Code.",
   "author": {
     "name": "Adrien Beyk",

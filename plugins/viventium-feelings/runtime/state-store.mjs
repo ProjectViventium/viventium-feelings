@@ -32,6 +32,7 @@ import {
   normalizeRangeOverrides,
   parseAppraisal,
 } from './kernel.mjs';
+import { withOwnedDirectoryLock } from './owned-directory-lock.mjs';
 
 const SCHEMA_VERSION = 1;
 const STATE_FILE = 'state.json';
@@ -56,8 +57,6 @@ export class ValidationError extends Error {
     this.code = code;
   }
 }
-
-const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -378,105 +377,18 @@ async function atomicWriteJson(filePath, value) {
   await chmod(filePath, 0o600);
 }
 
-function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid < 1) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error?.code === 'EPERM';
-  }
-}
-
-async function reclaimableLockSnapshot(lockPath) {
-  try {
-    const info = await stat(lockPath);
-    if (Date.now() - info.mtimeMs <= STALE_LOCK_MS) return null;
-    try {
-      const owner = JSON.parse(await readFile(path.join(lockPath, LOCK_OWNER), 'utf8'));
-      return processIsAlive(owner.pid) ? null : { ino: info.ino, token: owner.token ?? null };
-    } catch {
-      return { ino: info.ino, token: null };
-    }
-  } catch {
-    return null;
-  }
-}
-
-async function sameLockSnapshot(lockPath, expected) {
-  try {
-    const info = await stat(lockPath);
-    const owner = await readFile(path.join(lockPath, LOCK_OWNER), 'utf8')
-      .then((value) => JSON.parse(value))
-      .catch(() => ({}));
-    return info.ino === expected.ino && (owner.token ?? null) === expected.token
-      && !processIsAlive(owner.pid);
-  } catch {
-    return false;
-  }
-}
-
-async function releaseOwnedLock(lockPath, token) {
-  try {
-    const owner = JSON.parse(await readFile(path.join(lockPath, LOCK_OWNER), 'utf8'));
-    if (owner.token === token) await rm(lockPath, { recursive: true, force: true });
-  } catch {
-    // Missing or replaced ownership is never ours to remove.
-  }
-}
-
 async function withLock(dir, operation, waitMs = DEFAULT_LOCK_WAIT_MS) {
   await ensurePrivateDir(dir);
-  const lockPath = path.join(dir, LOCK_DIR);
-  const deadline = Date.now() + waitMs;
-  const token = randomBytes(16).toString('hex');
-  for (;;) {
-    try {
-      await mkdir(lockPath, { mode: 0o700 });
-      try {
-        await writeLockOwner(lockPath, token);
-      } catch (error) {
-        await rm(lockPath, { recursive: true, force: true });
-        throw error;
-      }
-      break;
-    } catch (error) {
-      if (error?.code !== 'EEXIST') throw error;
-      const snapshot = await reclaimableLockSnapshot(lockPath);
-      if (snapshot && await sameLockSnapshot(lockPath, snapshot)) {
-        const tombstone = `${lockPath}.stale.${process.pid}.${randomBytes(6).toString('hex')}`;
-        try {
-          await rename(lockPath, tombstone);
-          if (await sameLockSnapshot(tombstone, snapshot)) {
-            await rm(tombstone, { recursive: true, force: true });
-          } else {
-            await rename(tombstone, lockPath).catch(() => {});
-          }
-        } catch (reclaimError) {
-          if (!['ENOENT', 'EEXIST'].includes(reclaimError?.code)) throw reclaimError;
-        }
-        continue;
-      }
-      if (Date.now() >= deadline) throw new Error('state_lock_timeout');
-      await sleep(15 + Math.floor(Math.random() * 25));
-    }
-  }
-  try {
-    return await operation();
-  } finally {
-    await releaseOwnedLock(lockPath, token);
-  }
-}
-
-async function writeLockOwner(lockPath, token) {
-  const ownerPath = path.join(lockPath, LOCK_OWNER);
-  const handle = await open(ownerPath, 'wx', 0o600);
-  try {
-    await handle.writeFile(`${JSON.stringify({ pid: process.pid, token })}\n`, 'utf8');
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
+  return withOwnedDirectoryLock({
+    parentDir: dir,
+    lockName: LOCK_DIR,
+    ownerName: LOCK_OWNER,
+    staleMs: STALE_LOCK_MS,
+    waitMs,
+    timeoutCode: 'state_lock_timeout',
+    retryDelay: () => 15 + Math.floor(Math.random() * 25),
+    operation,
+  });
 }
 
 async function appendAudit(dir, entry) {
@@ -831,6 +743,7 @@ export function createStateStore({ dir = resolveStateDir(), now = () => new Date
         /^state\.corrupt\.\d+\.json$/u.test(name)
         || /^\.state\.json\..+\.tmp$/u.test(name)
         || /^\.state\.lock\.stale\./u.test(name)
+        || /^\.state\.lock\.release\./u.test(name)
       ));
       await Promise.all(residuals.map((name) => rm(path.join(dir, name), { recursive: true, force: true })));
       return { erased: true };

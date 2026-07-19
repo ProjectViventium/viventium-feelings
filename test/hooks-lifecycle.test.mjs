@@ -208,6 +208,45 @@ test('concurrent writers reclaim one stale queue lock without deleting a new own
   assert.equal((await readdir(path.join(dir, 'jobs'))).includes('.queue-lock'), false);
 });
 
+test('a crashed stale-reclaim claim is cleared before concurrent queue recovery', async (t) => {
+  const { dir, store } = await fixture(t);
+  await store.setEnabled({ expectedVersion: 0, enabled: true });
+  const queueLock = path.join(dir, 'jobs', '.queue-lock');
+  await mkdir(queueLock, { recursive: true });
+  await writeFile(path.join(queueLock, 'owner.json'), `${JSON.stringify({
+    pid: 2_147_483_647,
+    token: 'stale-owner',
+  })}\n`, { mode: 0o600 });
+  const reclaimClaim = path.join(queueLock, '.reclaim.json');
+  await writeFile(reclaimClaim, `${JSON.stringify({
+    pid: 2_147_483_647,
+    token: 'stale-reclaimer',
+  })}\n`, { mode: 0o600 });
+  const stale = new Date(Date.now() - 60_000);
+  await utimes(queueLock, stale, stale);
+  for (const name of ['.queue-lock.stale.synthetic', '.queue-lock.release.synthetic']) {
+    const tombstone = path.join(dir, 'jobs', name);
+    await mkdir(tombstone, { mode: 0o700 });
+    await utimes(tombstone, stale, stale);
+  }
+  const launched = [];
+  await Promise.all(Array.from({ length: 8 }, (_, index) => handleUserPrompt({
+    input: {
+      session_id: 'session-queue-reclaim-crash',
+      turn_id: String(index),
+      prompt: `Synthetic recovered turn ${index}.`,
+    },
+    store,
+    stateDir: dir,
+    host: 'codex',
+    launchWorker: async (payload) => { launched.push(payload); },
+  })));
+  assert.equal(launched.length, 4);
+  const jobs = await readdir(path.join(dir, 'jobs'));
+  assert.equal(jobs.includes('.queue-lock'), false);
+  assert.equal(jobs.some((name) => name.startsWith('.queue-lock.')), false);
+});
+
 test('disabled reaction mode keeps the capsule but launches no worker', async (t) => {
   const { dir, store } = await fixture(t);
   let state = await store.setEnabled({ expectedVersion: 0, enabled: true });

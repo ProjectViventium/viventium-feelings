@@ -27,6 +27,7 @@ completed visible reply
 | `runtime/kernel.mjs` | bands, ranges, decay, capsule, typed delta math | filesystem, host CLIs, HTTP |
 | `runtime/state-store.mjs` | migrations, permissions, atomic files, locks, version, epoch, ledger | raw prompt storage |
 | `runtime/completion-gate.mjs` | bounded metadata-only queue, 30-minute completion signal, ready-only ordering | raw prompt persistence |
+| `runtime/owned-directory-lock.mjs` | owner-claimed queue/state serialization, safe stale reclaim and release | product state or prompt data |
 | `runtime/reaction-worker.mjs` | appraiser orchestration and ordered commit | user-facing response |
 | `runtime/appraiser.mjs` | Claude/Codex command construction, child isolation, and strict response parsing | paths from model output |
 | `hooks/*` | host input/output adaptation and completion signaling | emotional NLU |
@@ -36,8 +37,10 @@ completed visible reply
 ## Persistence
 
 Each host gets a separate profile under its native plugin data directory. The store uses versioned
-JSON, atomic write-and-rename, user-only permissions, a process lock, a 100-key processed-stimulus
-ledger, a 90-entry typed trail, and a control epoch. No database or background service is required.
+JSON, atomic write-and-rename, user-only permissions, an owner-claimed process lock, a 100-key
+processed-stimulus ledger, a 90-entry typed trail, and a control epoch. Stale lock recovery has its
+own exclusive claim so delayed contenders cannot move a replacement owner. No database or
+background service is required.
 
 The dashboard is a client of the same state service. Browser storage is not an authority.
 

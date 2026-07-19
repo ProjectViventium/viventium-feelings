@@ -122,7 +122,7 @@ export function createMcpService({ store = createStateStore(), openBrowser } = {
         result: {
           protocolVersion: message.params?.protocolVersion ?? '2025-06-18',
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'viventium-feelings', version: '0.1.0' },
+          serverInfo: { name: 'viventium-feelings', version: '0.1.1' },
         },
       };
       if (message.method === 'notifications/initialized') return null;

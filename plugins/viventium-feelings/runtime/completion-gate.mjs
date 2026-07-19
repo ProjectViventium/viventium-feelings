@@ -1,8 +1,8 @@
-import { randomBytes } from 'node:crypto';
-import { access, chmod, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { sessionKeyFor, submissionKeyFor } from './event-id.mjs';
+import { withOwnedDirectoryLock } from './owned-directory-lock.mjs';
 
 const JOBS_DIR = 'jobs';
 const ACTIVE_SLOT = '.active-reaction.json';
@@ -36,97 +36,17 @@ async function privateWrite(filePath, value) {
   await chmod(filePath, 0o600);
 }
 
-function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid < 1) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error?.code === 'EPERM';
-  }
-}
-
-async function queueLockSnapshot(lockPath) {
-  try {
-    const details = await stat(lockPath);
-    if (Date.now() - details.mtimeMs <= STALE_QUEUE_LOCK_MS) return null;
-    const owner = await readFile(path.join(lockPath, QUEUE_LOCK_OWNER), 'utf8')
-      .then((value) => JSON.parse(value))
-      .catch(() => ({}));
-    return processIsAlive(owner.pid) ? null : { ino: details.ino, token: owner.token ?? null };
-  } catch {
-    return null;
-  }
-}
-
-async function sameQueueLock(lockPath, expected) {
-  try {
-    const details = await stat(lockPath);
-    const owner = await readFile(path.join(lockPath, QUEUE_LOCK_OWNER), 'utf8')
-      .then((value) => JSON.parse(value))
-      .catch(() => ({}));
-    return details.ino === expected.ino && (owner.token ?? null) === expected.token
-      && !processIsAlive(owner.pid);
-  } catch {
-    return false;
-  }
-}
-
-async function releaseQueueLock(lockPath, token) {
-  try {
-    const owner = JSON.parse(await readFile(path.join(lockPath, QUEUE_LOCK_OWNER), 'utf8'));
-    if (owner.token === token) await rm(lockPath, { recursive: true, force: true });
-  } catch {
-    // A missing or replaced queue lock is never ours to remove.
-  }
-}
-
 async function withQueueLock(stateDir, action) {
   const root = path.join(stateDir, JOBS_DIR);
-  const lockPath = path.join(root, QUEUE_LOCK);
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  await chmod(root, 0o700);
-  const deadline = Date.now() + QUEUE_LOCK_WAIT_MS;
-  const token = randomBytes(16).toString('hex');
-  while (true) {
-    try {
-      await mkdir(lockPath, { mode: 0o700 });
-      try {
-        await privateWrite(
-          path.join(lockPath, QUEUE_LOCK_OWNER),
-          `${JSON.stringify({ pid: process.pid, token })}\n`,
-        );
-      } catch (error) {
-        await rm(lockPath, { recursive: true, force: true });
-        throw error;
-      }
-      break;
-    } catch (error) {
-      if (error?.code !== 'EEXIST') throw error;
-      const snapshot = await queueLockSnapshot(lockPath);
-      if (snapshot && await sameQueueLock(lockPath, snapshot)) {
-        const tombstone = `${lockPath}.stale.${process.pid}.${randomBytes(6).toString('hex')}`;
-        try {
-          await rename(lockPath, tombstone);
-          if (await sameQueueLock(tombstone, snapshot)) {
-            await rm(tombstone, { recursive: true, force: true });
-          } else {
-            await rename(tombstone, lockPath).catch(() => {});
-          }
-        } catch (reclaimError) {
-          if (!['ENOENT', 'EEXIST'].includes(reclaimError?.code)) throw reclaimError;
-        }
-        continue;
-      }
-      if (Date.now() >= deadline) throw new Error('reaction_queue_lock_timeout');
-      await sleep(20);
-    }
-  }
-  try {
-    return await action(root);
-  } finally {
-    await releaseQueueLock(lockPath, token);
-  }
+  return withOwnedDirectoryLock({
+    parentDir: root,
+    lockName: QUEUE_LOCK,
+    ownerName: QUEUE_LOCK_OWNER,
+    staleMs: STALE_QUEUE_LOCK_MS,
+    waitMs: QUEUE_LOCK_WAIT_MS,
+    timeoutCode: 'reaction_queue_lock_timeout',
+    operation: () => action(root),
+  });
 }
 
 async function listPendingMetadata(jobsDir) {

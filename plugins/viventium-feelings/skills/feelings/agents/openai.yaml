@@ -1,6 +1,9 @@
 interface:
   display_name: "Viventium Feelings"
   short_description: "See and shape persistent local feelings"
+  icon_small: "./assets/viventium-v.png"
+  icon_large: "./assets/viventium-v.png"
+  brand_color: "#16161A"
   default_prompt: "Open my Viventium Feelings dashboard and explain what is moving."
 
 policy:

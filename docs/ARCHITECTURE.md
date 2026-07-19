@@ -32,6 +32,7 @@ completed visible reply
 | `runtime/appraiser.mjs` | Claude/Codex command construction, child isolation, and strict response parsing | paths from model output |
 | `hooks/*` | host input/output adaptation and completion signaling | emotional NLU |
 | `runtime/mcp-server.mjs` | explicit tools and dashboard launch | automatic prompt lifecycle |
+| `runtime/status-presence.mjs` | explicit Claude status-line opt-in and owned-setting removal | silent host configuration or Codex tray claims |
 | `dashboard/*` | live local instrument and versioned controls | state authority |
 
 ## Persistence
@@ -42,7 +43,9 @@ processed-stimulus ledger, a 90-entry typed trail, and a control epoch. Stale lo
 own exclusive claim so delayed contenders cannot move a replacement owner. No database or
 background service is required.
 
-The dashboard is a client of the same state service. Browser storage is not an authority.
+The dashboard is a client of the same state service. Its separate `dashboard-preferences.json`
+stores only the System/Light/Dark choice under the same private directory and lock; it never changes
+the emotional state version. Browser storage is not an authority.
 
 ## Host adaptation
 
@@ -69,6 +72,14 @@ one-time bearer token. The browser exchanges it for an HttpOnly, SameSite=Strict
 removes the fragment from the address, and sends the exact Origin on same-origin mutations. The
 server applies strict JSON schemas and version preconditions, emits a strict CSP and no CORS
 headers, loads no external resources, and exits after idle timeout.
+
+The Codex manifest carries the official V for supported plugin/composer surfaces. Claude Code's
+main status line is user settings, not a plugin default: the dashboard/MCP explicit opt-in copies a
+small local renderer, refuses to overwrite an existing `statusLine`, and removes only its exact
+owned command. Settings mutation preserves valid symlinks, serializes plugin writers under an
+owner-claimed lock, and rejects a file changed by an external editor before atomic replacement.
+The command treats its encoded script path as data rather than interpolated shell syntax. No plugin
+code claims a host-independent OS tray.
 
 ## Deliberate non-parity
 

@@ -36,6 +36,12 @@ deterministic control of model behavior.
 - Pause stops injection and appraisal but preserves local state and decay.
 - Erase is destructive. State exactly what is removed and obtain explicit confirmation before
   calling `feelings_erase`.
+- When the user asks for a V/status indicator, call `feelings_get_status_presence`. Codex uses the
+  plugin's native V identity in supported composer/directory surfaces. Claude Code can add a
+  persistent `V Feelings` status line only as an explicit opt-in.
+- Call `feelings_set_status_presence` only after the user explicitly asks to add or remove it.
+  Enabling refuses to overwrite an existing custom Claude status line; disabling removes only the
+  Viventium-owned command.
 
 ## Truth and privacy
 

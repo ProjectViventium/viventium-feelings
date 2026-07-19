@@ -3,23 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light dark">
+    <meta id="themeColor" name="theme-color" content="#f7f7f5">
+    <meta name="viventium-theme" content="system" data-viventium-theme>
     <title>Viventium Feelings</title>
+    <link rel="icon" type="image/png" sizes="96x96" href="/viventium-v.png">
+    <script src="/theme-init.js"></script>
     <link rel="stylesheet" href="/dashboard.css">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <a class="brand" href="#now" aria-label="Viventium Feelings home">
-          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span><strong>Viventium</strong><small>Feelings</small></span>
+          <span class="brand-mark" aria-hidden="true">
+            <img src="/viventium-v.png" alt="">
+          </span>
+          <span class="brand-word">
+            <span class="lead">Viventium</span>
+            <span class="name">Feelings</span>
+          </span>
         </a>
         <div class="topbar-actions">
           <span id="hostBadge" class="host-badge">Local</span>
+          <button id="themeToggle" class="icon-toggle" type="button" aria-label="Theme: match system" title="Theme"></button>
           <label class="power-control">
             <span id="powerLabel">Off</span>
             <input id="powerToggle" type="checkbox" role="switch" aria-label="Enable Feelings">
-            <span aria-hidden="true"></span>
+            <span class="power-track" aria-hidden="true"></span>
           </label>
         </div>
       </header>
@@ -38,15 +48,16 @@
             <div>
               <p class="eyebrow">Live emotional state</p>
               <h1 id="nowTitle">Now</h1>
+              <p class="sub">Drag <strong>Now</strong> or <strong>Nature</strong> on any lane to tune it live. Open a lane for return speed and deeper options.</p>
             </div>
-            <p id="freshness" class="freshness" aria-live="polite">Connecting…</p>
+            <p id="freshness" class="freshness">Connecting…</p>
           </div>
 
           <div class="instrument-layout">
-            <div id="bands" class="bands" aria-live="polite" aria-busy="true"></div>
+            <div id="bands" class="bands" aria-busy="true"></div>
             <aside class="state-inspector" aria-label="Current private reaction">
               <p class="eyebrow">Inner state</p>
-              <blockquote id="innerState">No reaction yet.</blockquote>
+              <blockquote id="innerState" class="empty" aria-live="polite">No reaction yet.</blockquote>
               <div class="health-line">
                 <span id="healthDot" class="health-dot" aria-hidden="true"></span>
                 <span id="healthText">Waiting for first reaction</span>
@@ -63,9 +74,9 @@
         <section id="nature" class="section-block" aria-labelledby="natureTitle">
           <div class="section-heading compact">
             <div><p class="eyebrow">Resting personality</p><h2 id="natureTitle">Nature</h2></div>
-            <p>Profiles are transparent starting points. Every value remains yours to tune.</p>
+            <p>Profiles are transparent starting points. Every value stays yours to tune per lane.</p>
           </div>
-          <div id="profiles" class="profile-list" role="list"></div>
+          <div id="profiles" class="profile-list" aria-label="Nature profiles"></div>
         </section>
 
         <section id="trail" class="section-block" aria-labelledby="trailTitle">
@@ -88,6 +99,10 @@
               <div class="field-actions"><span id="instructionCount">0 / 4000</span><button id="saveInstruction" class="quiet-button">Save instruction</button></div>
             </div>
             <div class="control-list">
+              <button id="hostPresenceButton" class="control-row" type="button">
+                <span><strong id="hostPresenceTitle">Host presence</strong><small id="hostPresenceHelp">Checking this host…</small></span>
+                <b id="hostPresenceLabel">Checking</b>
+              </button>
               <button id="resetButton" class="control-row"><span><strong>Reset Current</strong><small>Return all feelings to Nature</small></span><b>Reset</b></button>
               <button id="pauseButton" class="control-row"><span><strong>Pause Feelings</strong><small>Stop context and reactions; keep state</small></span><b>Pause</b></button>
               <button id="eraseButton" class="control-row danger"><span><strong>Erase local data</strong><small>Remove state, trail, gates, audit, and key</small></span><b>Erase</b></button>
@@ -106,29 +121,6 @@
         </section>
       </main>
     </div>
-
-    <dialog id="bandDialog" aria-labelledby="bandDialogTitle">
-      <form method="dialog" class="dialog-shell">
-        <div class="dialog-heading">
-          <div><p class="eyebrow">Tune this feeling</p><h2 id="bandDialogTitle">Band</h2></div>
-          <button value="cancel" class="icon-button" aria-label="Close">×</button>
-        </div>
-        <p id="bandDescription" class="dialog-description"></p>
-        <label for="currentInput">Current <output id="currentOutput"></output></label>
-        <input id="currentInput" type="range" min="0" max="100" step="1">
-        <label for="natureInput">Nature <output id="natureOutput"></output></label>
-        <input id="natureInput" type="range" min="0" max="100" step="1">
-        <label for="halfLifeInput">Half-life in minutes</label>
-        <input id="halfLifeInput" type="number" min="1" max="525600" step="1">
-        <label class="check-row"><input id="bandEnabled" type="checkbox"> Include this band in Feelings</label>
-        <details class="range-editor">
-          <summary>Range embodiment</summary>
-          <p>Add optional language to any of this feeling's five built-in ranges. The built-in meaning always remains visible. The active capsule has a shared 2,400-byte safety limit.</p>
-          <div id="rangePrompts"></div>
-        </details>
-        <div class="dialog-actions"><button value="cancel" class="quiet-button">Cancel</button><button id="saveBand" value="default" class="primary-button">Save changes</button></div>
-      </form>
-    </dialog>
 
     <dialog id="confirmDialog" aria-labelledby="confirmTitle">
       <form method="dialog" class="confirm-shell">

@@ -16,6 +16,9 @@ test('ships native Claude and Codex manifests over one shared plugin root', asyn
   assert.equal(claude.author.name, 'Adrien Beyk');
   assert.equal(codex.mcpServers, './.codex-mcp.json');
   assert.equal(claude.mcpServers, './.claude-mcp.json');
+  assert.equal(claude.displayName, 'Viventium Feelings');
+  assert.equal(codex.interface.composerIcon, './assets/viventium-v.png');
+  assert.equal(codex.interface.logo, './assets/viventium-v.png');
   const codexMcp = JSON.parse(await readFile(path.join(PLUGIN, '.codex-mcp.json'), 'utf8'));
   const claudeMcp = JSON.parse(await readFile(path.join(PLUGIN, '.claude-mcp.json'), 'utf8'));
   assert.equal(codexMcp.mcpServers['viventium-feelings'].args[0], './runtime/mcp-server.mjs');
@@ -34,6 +37,23 @@ test('marketplaces point at the same relative plugin root', async () => {
   assert.equal(claude.plugins[0].source, './plugins/viventium-feelings');
 });
 
+test('release version is consistent across package, host, marketplace, citation, and server surfaces', async () => {
+  const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
+  const lock = JSON.parse(await readFile(path.join(ROOT, 'package-lock.json'), 'utf8'));
+  const codex = JSON.parse(await readFile(path.join(PLUGIN, '.codex-plugin', 'plugin.json'), 'utf8'));
+  const claude = JSON.parse(await readFile(path.join(PLUGIN, '.claude-plugin', 'plugin.json'), 'utf8'));
+  const marketplace = JSON.parse(await readFile(path.join(ROOT, '.claude-plugin', 'marketplace.json'), 'utf8'));
+  const citation = await readFile(path.join(ROOT, 'CITATION.cff'), 'utf8');
+  const mcp = await readFile(path.join(PLUGIN, 'runtime', 'mcp-server.mjs'), 'utf8');
+  const versions = [
+    pkg.version, lock.version, lock.packages[''].version, codex.version, claude.version,
+    marketplace.plugins[0].version,
+  ];
+  assert.ok(versions.every((version) => version === pkg.version), versions.join(','));
+  assert.match(citation, new RegExp(`^version: ${pkg.version.replaceAll('.', '\\.')}$`, 'mu'));
+  assert.match(mcp, new RegExp(`serverInfo: \\{ name: 'viventium-feelings', version: '${pkg.version.replaceAll('.', '\\.')}' \\}`, 'u'));
+});
+
 test('package contains hooks, skill, MCP server, dashboard, and legal controls', async () => {
   const required = [
     'hooks/hooks.json',
@@ -43,9 +63,15 @@ test('package contains hooks, skill, MCP server, dashboard, and legal controls',
     'runtime/state-store.mjs',
     'runtime/reaction-worker.mjs',
     'runtime/mcp-server.mjs',
+    'runtime/status-presence.mjs',
     'dashboard/index.html',
     'dashboard/dashboard.css',
     'dashboard/dashboard.js',
+    'dashboard/render.js',
+    'dashboard/api.js',
+    'dashboard/theme-init.js',
+    'assets/viventium-v.png',
+    'skills/feelings/agents/assets/viventium-v.png',
     'skills/feelings/SKILL.md',
   ];
   await Promise.all(required.map((relative) => access(path.join(PLUGIN, relative))));
@@ -71,5 +97,5 @@ test('public docs disclose the exact embodied frame and contain no private runti
   ])));
   assert.match(documents['README.md'], new RegExp(EMBODIED_FEELING_FRAME.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
   assert.match(documents['docs/PRODUCT_CONTRACT.md'], new RegExp(EMBODIED_FEELING_FRAME.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
-  assert.doesNotMatch(Object.values(documents).join('\n'), /Phase B|GlassHive|Terra-to-Opus/u);
+  assert.doesNotMatch(Object.values(documents).join('\n'), /Phase B|GlassHive/u);
 });

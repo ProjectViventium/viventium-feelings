@@ -30,6 +30,51 @@ test('serves a no-external-resource dashboard with strict browser headers', asyn
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
   assert.equal(response.headers.get('access-control-allow-origin'), null);
   assert.match(await response.text(), /Viventium Feelings/u);
+  const icon = await fetch(`${dashboard.origin}/viventium-v.png`);
+  assert.equal(icon.status, 200);
+  assert.equal(icon.headers.get('content-type'), 'image/png');
+});
+
+test('theme preference persists across random-port dashboard relaunches without changing feelings', async (t) => {
+  const { dashboard, headers, store } = await fixture(t);
+  let response = await fetch(`${dashboard.origin}/api/dashboard-preferences`, {
+    method: 'PATCH',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ theme: 'dark' }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await store.read()).version, 0);
+  await dashboard.close();
+  const relaunched = await startDashboardServer({ store, host: 'codex', port: 0, idleTimeoutMs: 0 });
+  t.after(() => relaunched.close());
+  assert.notEqual(relaunched.origin, dashboard.origin);
+  const html = await (await fetch(`${relaunched.origin}/`)).text();
+  assert.match(html, /name="viventium-theme" content="dark" data-viventium-theme/u);
+  response = await fetch(`${relaunched.origin}/api/dashboard-preferences`, {
+    method: 'PATCH',
+    headers: {
+      authorization: `Bearer ${relaunched.token}`,
+      origin: relaunched.origin,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ theme: 'sepia' }),
+  });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, 'theme_invalid');
+});
+
+test('dashboard exposes host-specific status presence without pretending Codex owns a tray', async (t) => {
+  const { dashboard, headers } = await fixture(t);
+  let response = await fetch(`${dashboard.origin}/api/status-presence`, { headers });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).status, 'native_branding');
+  response = await fetch(`${dashboard.origin}/api/status-presence`, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'enable' }),
+  });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, 'status_presence_unsupported');
 });
 
 test('API requires the launch bearer or session and exact same origin for mutations', async (t) => {
@@ -186,7 +231,7 @@ test('versioned controls enable, tune, apply profile, reset, and erase', async (
   assert.equal(await store.exists(), false);
 });
 
-test('dashboard renderer never injects state via innerHTML', async () => {
+test('dashboard renderer never injects state through HTML parsing sinks', async () => {
   const dashboard = await readFile(
     path.resolve(import.meta.dirname, '../plugins/viventium-feelings/dashboard/dashboard.js'),
     'utf8',
@@ -195,11 +240,22 @@ test('dashboard renderer never injects state via innerHTML', async () => {
     path.resolve(import.meta.dirname, '../plugins/viventium-feelings/dashboard/render.js'),
     'utf8',
   );
-  assert.doesNotMatch(`${dashboard}\n${render}`, /\.innerHTML\s*=/u);
+  assert.doesNotMatch(
+    `${dashboard}\n${render}`,
+    /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/u,
+  );
   assert.match(render, /textContent/u);
   const api = await readFile(
     path.resolve(import.meta.dirname, '../plugins/viventium-feelings/dashboard/api.js'),
     'utf8',
   );
   assert.match(api, /history\.replaceState[\s\S]*token = ''/u);
+});
+
+test('dashboard freshness timestamp is not a repeating live-region announcement', async () => {
+  const html = await readFile(
+    path.resolve(import.meta.dirname, '../plugins/viventium-feelings/dashboard/index.html'),
+    'utf8',
+  );
+  assert.doesNotMatch(html, /id="freshness"[^>]*aria-live/iu);
 });

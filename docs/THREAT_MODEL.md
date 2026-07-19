@@ -1,6 +1,6 @@
 # Threat model
 
-Status: release-gate model for `0.1.1`.
+Status: release-gate model for `0.1.2`.
 
 ## Trust boundaries and assets
 
@@ -11,6 +11,7 @@ Status: release-gate model for `0.1.1`.
 | State store | persisted JSON and concurrent writers | local affect state, user control |
 | MCP | model-selected tool name and arguments | explicit user settings and destructive controls |
 | Dashboard | browser request and form values | local state and launch token |
+| Host presence | explicit user action and existing Claude settings | unrelated settings and custom status line |
 
 Raw conversation content and existing host credentials are the highest-sensitivity assets. Feeling
 integrity and user's ability to turn the feature off or erase it are the highest-availability and
@@ -44,6 +45,14 @@ control assets.
   an exact Host; a random in-memory launch token bootstraps an HttpOnly SameSite=Strict session;
   state-changing browser requests additionally require the exact Origin. There is no CORS
   allowlist or cross-origin credential access.
+- **Presence setup overwrites user customization or executes a hostile path.** Setup is never
+  automatic. Claude enable fails closed if any non-owned `statusLine` exists; a private
+  owner-claimed lock serializes plugin writers; a compare-before-rename check rejects external
+  changes; and valid settings symlinks are edited through their resolved targets instead of being
+  replaced. The command imports a base64-encoded absolute script path as data, so shell
+  metacharacters in the config path cannot become shell syntax. Disable removes only the exact
+  managed command. Codex branding is declarative manifest metadata and does not edit user
+  configuration.
 - **Local files disclose prompt content.** Gate files contain keyed identifiers and fixed metadata
   only. State and audit files are user-only. Erase cascades through state, jobs, audit, and key.
 - **Unbounded cost or denial of service.** Hook input, stimulus, capsule UTF-8 bytes, HTTP body,
@@ -56,6 +65,8 @@ control assets.
 - The host may persist its own conversation or hook context. Local Feelings erase cannot remove
   host transcripts or provider records.
 - Host CLI flags and plugin hook contracts can change; native version QA is required per release.
+- Claude currently exposes no plugin-uninstall cleanup hook. Users who opted into Add V must use
+  Remove V before uninstall; the supported lifecycle is documented and tested in an isolated home.
 - Codex's beta filesystem permission profile is a host boundary, not a formally verified OS jail in
   this package; native version QA remains mandatory.
 - Behavioral influence is probabilistic. Typed state integrity does not guarantee a particular tone.

@@ -39,6 +39,9 @@ export const api = Object.freeze({
   band: (expectedVersion, bandId, patch) => request(`/api/bands/${encodeURIComponent(bandId)}`, { method: 'PATCH', body: { expectedVersion, patch } }),
   profile: (expectedVersion, profileId) => request('/api/profile', { method: 'POST', body: { expectedVersion, profileId, resetCurrent: true } }),
   settings: (expectedVersion, patch) => request('/api/settings', { method: 'PATCH', body: { expectedVersion, patch } }),
+  theme: (theme) => request('/api/dashboard-preferences', { method: 'PATCH', body: { theme } }),
+  statusPresence: () => request('/api/status-presence'),
+  setStatusPresence: (action) => request('/api/status-presence', { method: 'POST', body: { action } }),
   reset: (expectedVersion) => request('/api/reset', { method: 'POST', body: { expectedVersion } }),
   erase: (expectedVersion) => request('/api/state', { method: 'DELETE', body: { expectedVersion } }),
 });

@@ -18,7 +18,10 @@ to meaningful moments, and naturally return toward a personality you choose.
 
 Keep the intelligence. Own the emotional layer.
 
-![Viventium Feelings live dashboard](docs/assets/dashboard.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dashboard-dark.png">
+  <img alt="Viventium Feelings live dashboard" src="docs/assets/dashboard.png">
+</picture>
 
 ## What you experience
 
@@ -30,6 +33,9 @@ Keep the intelligence. Own the emotional layer.
   Every feeling fades back toward its own Nature on its own timescale.
 - **A private instrument.** Watch Current versus Nature, read one Inner state line, inspect the
   reaction trail and health, pause, reset, or erase everything.
+- **A V where the host supports it.** Codex declares the V for native plugin/composer surfaces; Claude
+  Code offers an explicit, reversible `V Feelings` status-line option that preserves any existing
+  custom status line.
 - **No second account.** Appraisal uses your existing signed-in Claude Code or Codex harness. No
   Viventium key or hosted state service is required.
 
@@ -66,7 +72,29 @@ existing host subscription or API quota. The visible reply does not wait for app
 The in-memory completion gate stays available for up to 30 minutes per turn. If a turn is abandoned
 or runs longer, its reaction is safely skipped while the answer and feeling capsule keep working.
 
+### Optional host presence
+
+The dashboard always uses the exact Viventium website V as its browser/window icon. In Codex, the
+same asset is declared for supported plugin and composer surfaces. In Claude Code, open **Settings →
+Claude status line → Add V**, or ask:
+
+> Add Viventium Feelings to my Claude status line.
+
+That opt-in writes a small local status command and shows `V Feelings · On/Off · health`. It will
+not overwrite an existing custom Claude status line, and **Remove** deletes only Viventium's owned
+command. Current host plugin APIs do not give third-party plugins their own OS tray/menu-bar icon;
+the browser favicon and native host surfaces are described separately and honestly.
+
 ### Update or remove
+
+If you enabled **Add V** in Claude Code, remove it first from the dashboard (**Settings → Claude
+status line → Remove V**) or ask:
+
+> Remove Viventium Feelings from my Claude status line.
+
+Claude does not currently provide a plugin-uninstall cleanup hook. Removing V first is therefore
+the supported path: it removes only Viventium's owned status-line setting and script, while the
+plugin is still present to do so. It never replaces or deletes another custom status line.
 
 Claude Code updates and removes the installed plugin natively:
 
@@ -83,8 +111,10 @@ codex plugin remove viventium-feelings@project-viventium
 codex plugin add viventium-feelings@project-viventium
 ```
 
-Before uninstalling, use **Erase local data** in the dashboard if you want the state, trail, audit,
-gates, and local keys removed. Restart the host after an install, update, or removal.
+Before uninstalling, use **Erase local data** in the dashboard if you also want the state, trail,
+audit, gates, and local keys removed. Erase and Remove V are intentionally separate: erasing
+Feelings data does not silently edit Claude settings. Restart the host after an install, update, or
+removal.
 
 ## The first 90 seconds
 

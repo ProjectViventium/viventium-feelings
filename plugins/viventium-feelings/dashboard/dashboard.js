@@ -5,27 +5,102 @@ const elements = Object.fromEntries([
   'bands', 'profiles', 'trailList', 'innerState', 'healthDot', 'healthText', 'activeProfile',
   'stateVersion', 'activeHost', 'hostBadge', 'powerToggle', 'powerLabel', 'freshness',
   'reactionInstruction', 'instructionCount', 'saveInstruction', 'resetButton', 'pauseButton',
-  'eraseButton', 'bandDialog', 'bandDialogTitle', 'bandDescription', 'currentInput',
-  'currentOutput', 'natureInput', 'natureOutput', 'halfLifeInput', 'bandEnabled', 'saveBand',
-  'rangePrompts', 'confirmDialog', 'confirmTitle', 'confirmText', 'confirmAction', 'toast',
-  'onboardingDialog',
+  'eraseButton', 'confirmDialog', 'confirmTitle', 'confirmText', 'confirmAction', 'toast',
+  'onboardingDialog', 'themeToggle', 'themeColor', 'hostPresenceButton', 'hostPresenceTitle',
+  'hostPresenceHelp', 'hostPresenceLabel',
 ].map((id) => [id, document.getElementById(id)]));
 
 let state;
 let host;
-let selectedBandId;
 let confirming;
 let pollTimer;
 let onboardingShown = false;
+let statusPresence;
 
+// Focus and pending writes are separate: moving among controls within one band
+// must not increment a shared counter and leave the lane permanently stale.
+// Polls preserve the union so they cannot fight focus, drafts, or queued writes.
+const focusedBands = new Set();
+const pendingEdits = new Map();
+const beginEdit = (id) => pendingEdits.set(id, (pendingEdits.get(id) || 0) + 1);
+const endEdit = (id) => {
+  const next = (pendingEdits.get(id) || 0) - 1;
+  if (next > 0) pendingEdits.set(id, next); else pendingEdits.delete(id);
+};
+const interactingBands = () => new Set([...focusedBands, ...pendingEdits.keys()]);
+const hasActiveEdits = () => focusedBands.size > 0 || pendingEdits.size > 0;
+
+// Expand state + unsaved range drafts survive re-renders.
+const ui = { expanded: new Set(), drafts: new Map() };
+
+// ---- Theme (system by default; explicit override wins) --------------------
+const THEME_ORDER = ['system', 'light', 'dark'];
+let activeTheme = window.__VIVENTIUM_INITIAL_THEME__ ?? 'system';
+const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+
+function svgEl(tag, attrs) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [key, val] of Object.entries(attrs)) element.setAttribute(key, val);
+  return element;
+}
+
+function themeIcon(choice) {
+  const svg = svgEl('svg', { viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true' });
+  const stroke = { stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+  if (choice === 'dark') {
+    svg.append(svgEl('path', { d: 'M20 14.5A7.5 7.5 0 1 1 10.5 4a6 6 0 0 0 9.5 10.5Z', ...stroke }));
+  } else if (choice === 'light') {
+    svg.append(svgEl('circle', { cx: '12', cy: '12', r: '4.2', ...stroke }));
+    for (const [x1, y1, x2, y2] of [
+      [12, 2.5, 12, 4.5], [12, 19.5, 12, 21.5], [2.5, 12, 4.5, 12], [19.5, 12, 21.5, 12],
+      [5.2, 5.2, 6.6, 6.6], [17.4, 17.4, 18.8, 18.8], [17.4, 5.2, 18.8, 6.6], [5.2, 17.4, 6.6, 18.8],
+    ]) svg.append(svgEl('line', { x1, y1, x2, y2, ...stroke }));
+  } else {
+    svg.append(svgEl('circle', { cx: '12', cy: '12', r: '8.4', ...stroke }));
+    svg.append(svgEl('path', { d: 'M12 3.6a8.4 8.4 0 0 1 0 16.8Z', fill: 'currentColor' }));
+  }
+  return svg;
+}
+
+function applyTheme(choice) {
+  activeTheme = THEME_ORDER.includes(choice) ? choice : 'system';
+  if (activeTheme === 'system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', activeTheme);
+  const resolved = activeTheme === 'system' ? (systemTheme.matches ? 'dark' : 'light') : activeTheme;
+  elements.themeColor.content = resolved === 'dark' ? '#0e0e10' : '#f7f7f5';
+  const label = { system: 'match system', light: 'light', dark: 'dark' }[activeTheme];
+  elements.themeToggle.setAttribute('aria-label', `Theme: ${label}. Activate to change.`);
+  elements.themeToggle.title = `Theme: ${label}`;
+  elements.themeToggle.replaceChildren(themeIcon(activeTheme));
+}
+
+elements.themeToggle.addEventListener('click', async () => {
+  const previous = activeTheme;
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(activeTheme) + 1) % THEME_ORDER.length];
+  applyTheme(next);
+  try {
+    await api.theme(next);
+  } catch {
+    applyTheme(previous);
+    toast('Theme preference could not be saved.', 'error');
+  }
+});
+systemTheme.addEventListener('change', () => {
+  if (activeTheme === 'system') applyTheme('system');
+});
+applyTheme(activeTheme);
+
+// ---- Helpers ---------------------------------------------------------------
 function displaySignature(value) {
   if (!value) return '';
   return JSON.stringify({
     version: value.version,
     enabled: value.enabled,
+    profileId: value.profileId,
     health: value.reactionHealth.status,
     healthError: value.reactionHealth.lastErrorClass,
     healthSkip: value.reactionHealth.lastSkipReason,
+    inner: value.innerState?.generatedAt ?? null,
   });
 }
 
@@ -38,38 +113,6 @@ function toast(message, tone = 'normal') {
 
 function profileName() {
   return state.profiles[state.profileId]?.name ?? 'Custom';
-}
-
-function updateFreshness(value) {
-  elements.freshness.textContent = `Live · updated ${new Date(value.asOf).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`;
-}
-
-function render(next, nextHost = host) {
-  const previous = state;
-  state = next;
-  host = nextHost;
-  renderBands(elements.bands, state, openBand, previous);
-  renderProfiles(elements.profiles, state, confirmProfile);
-  renderTrail(elements.trailList, state);
-  elements.innerState.textContent = state.innerState?.text ?? 'No reaction yet.';
-  elements.innerState.classList.toggle('empty', !state.innerState);
-  elements.healthText.textContent = healthCopy(state.reactionHealth);
-  elements.healthDot.dataset.status = state.reactionHealth.status;
-  elements.activeProfile.textContent = profileName();
-  elements.stateVersion.textContent = `v${state.version}`;
-  elements.activeHost.textContent = host === 'claude' ? 'Claude Code' : host === 'codex' ? 'Codex' : 'Local';
-  elements.hostBadge.textContent = elements.activeHost.textContent;
-  elements.powerToggle.checked = state.enabled;
-  elements.powerLabel.textContent = state.enabled ? 'On' : 'Off';
-  elements.pauseButton.querySelector('b').textContent = state.enabled ? 'Pause' : 'Resume';
-  if (document.activeElement !== elements.reactionInstruction) elements.reactionInstruction.value = state.reactionInstruction;
-  updateCount();
-  updateFreshness(state);
-  document.body.classList.toggle('feelings-off', !state.enabled);
-  if (!onboardingShown && state.version === 0 && !state.enabled) {
-    onboardingShown = true;
-    elements.onboardingDialog.showModal();
-  }
 }
 
 function healthCopy(health) {
@@ -99,14 +142,116 @@ function healthCopy(health) {
   return copy[health.status] ?? 'Reaction status unavailable';
 }
 
-async function refresh({ quiet = false, force = false } = {}) {
+function syncInspector() {
+  elements.innerState.textContent = state.innerState?.text ?? 'No reaction yet.';
+  elements.innerState.classList.toggle('empty', !state.innerState);
+  elements.healthText.textContent = healthCopy(state.reactionHealth);
+  elements.healthDot.dataset.status = state.reactionHealth.status;
+  elements.activeProfile.textContent = profileName();
+  elements.stateVersion.textContent = `v${state.version}`;
+  const hostName = host === 'claude' ? 'Claude Code' : host === 'codex' ? 'Codex' : 'Local';
+  elements.activeHost.textContent = hostName;
+  elements.hostBadge.textContent = hostName;
+  elements.powerToggle.checked = state.enabled;
+  elements.powerLabel.textContent = state.enabled ? 'On' : 'Off';
+  elements.pauseButton.querySelector('b').textContent = state.enabled ? 'Pause' : 'Resume';
+  if (document.activeElement !== elements.reactionInstruction) elements.reactionInstruction.value = state.reactionInstruction;
+  updateCount();
+  updateFreshness(state);
+  document.body.classList.toggle('feelings-off', !state.enabled);
+  if (!onboardingShown && state.version === 0 && !state.enabled) {
+    onboardingShown = true;
+    elements.onboardingDialog.showModal();
+  }
+}
+
+function syncStatusPresence() {
+  if (!statusPresence) return;
+  const isClaude = statusPresence.host === 'claude';
+  elements.hostPresenceTitle.textContent = isClaude ? 'Claude status line' : 'Codex V identity';
+  elements.hostPresenceHelp.textContent = statusPresence.message;
+  const labels = {
+    available: 'Add V', enabled: 'Remove', conflict: 'Already used',
+    native_branding: 'Included', unsupported: 'Unavailable',
+  };
+  elements.hostPresenceLabel.textContent = labels[statusPresence.status] ?? 'Unavailable';
+  elements.hostPresenceButton.disabled = !['available', 'enabled'].includes(statusPresence.status);
+}
+
+async function refreshStatusPresence({ quiet = true } = {}) {
+  try {
+    statusPresence = await api.statusPresence();
+    syncStatusPresence();
+  } catch {
+    elements.hostPresenceHelp.textContent = 'Host presence could not be checked.';
+    elements.hostPresenceLabel.textContent = 'Unavailable';
+    elements.hostPresenceButton.disabled = true;
+    if (!quiet) toast('Host presence could not be checked.', 'error');
+  }
+}
+
+function updateFreshness(value) {
+  elements.freshness.textContent = `Live · updated ${new Date(value.asOf).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`;
+}
+
+function captureBandFocus() {
+  const active = document.activeElement;
+  const band = active?.closest?.('.band');
+  const focusKey = active?.dataset?.focusKey;
+  return band && focusKey ? { bandId: band.dataset.band, focusKey } : null;
+}
+
+function restoreBandFocus(descriptor) {
+  if (!descriptor) return null;
+  const band = elements.bands.querySelector(`.band[data-band="${CSS.escape(descriptor.bandId)}"]`);
+  const control = band?.querySelector(`[data-focus-key="${CSS.escape(descriptor.focusKey)}"]`);
+  control?.focus({ preventScroll: true });
+  return control ?? null;
+}
+
+// Full render: rebuild the instrument (expand + drafts re-applied from ui).
+function render(next, nextHost = host) {
+  const priorFocus = captureBandFocus();
+  const previous = state;
+  state = next;
+  host = nextHost;
+  renderBands(elements.bands, state, handlers, ui, previous);
+  renderProfiles(elements.profiles, state, confirmProfile);
+  renderTrail(elements.trailList, state);
+  syncInspector();
+  // Rebuilding removes the focused DOM node and browsers emit no focusout for
+  // that removal. Reconcile the ledger and return focus to the equivalent field.
+  focusedBands.clear();
+  if (restoreBandFocus(priorFocus)) focusedBands.add(priorFocus.bandId);
+}
+
+// Light update: reuse the existing DOM (no re-animation, keeps focus/drafts).
+function lightUpdate(next, { forceBands = [] } = {}) {
+  const previous = state;
+  state = next;
+  const interacting = interactingBands();
+  for (const bandId of forceBands) interacting.delete(bandId);
+  updateBandReadings(elements.bands, state, { interacting, previous });
+  renderProfiles(elements.profiles, state, confirmProfile);
+  renderTrail(elements.trailList, state);
+  syncInspector();
+}
+
+async function refresh({ quiet = false, force = false, forceBands = [] } = {}) {
   try {
     const result = await api.state();
-    if (!force && state && displaySignature(state) === displaySignature(result.state)) {
-      updateBandReadings(elements.bands, result.state);
+    if (result.preferences?.theme && result.preferences.theme !== activeTheme) applyTheme(result.preferences.theme);
+    if (state && elements.bands.querySelector('.band')
+        && (hasActiveEdits() || (!force && displaySignature(state) === displaySignature(result.state)))) {
+      const previous = state;
       state = result.state;
       host = result.host;
-      updateFreshness(state);
+      const interacting = interactingBands();
+      for (const bandId of forceBands) interacting.delete(bandId);
+      updateBandReadings(elements.bands, state, { interacting, previous });
+      renderProfiles(elements.profiles, state, confirmProfile);
+      renderTrail(elements.trailList, state);
+      syncInspector();
     } else {
       render(result.state, result.host);
     }
@@ -116,65 +261,88 @@ async function refresh({ quiet = false, force = false } = {}) {
   }
 }
 
-async function mutate(action, success) {
+async function mutate(action, success, { light = false, rollbackBands = [] } = {}) {
   try {
     const result = await action();
-    if (result.state) render(result.state);
-    else await refresh({ quiet: true });
+    if (result.state) {
+      if (light && elements.bands.querySelector('.band')) lightUpdate(result.state);
+      else render(result.state);
+    } else {
+      await refresh({ quiet: true });
+    }
     toast(success);
+    return true;
   } catch (error) {
-    if (state) render(state, host);
+    if (state) {
+      if (light) lightUpdate(state, { forceBands: rollbackBands }); else render(state, host);
+    }
     if (error instanceof ApiError && error.status === 409) {
-      await refresh({ quiet: true, force: true });
+      await refresh({ quiet: true, force: true, forceBands: rollbackBands });
       toast('State changed elsewhere. Refreshed—please try once more.', 'error');
     } else if (error instanceof ApiError && error.code === 'capsule_limit') {
       toast('Active feeling language is too long for host context. Shorten the active additions.', 'error');
     } else {
       toast('That change could not be saved.', 'error');
     }
+    return false;
   }
 }
 
-function openBand(bandId) {
-  selectedBandId = bandId;
-  const definition = state.definitions.find((item) => item.id === bandId);
-  const band = state.bands[bandId];
-  elements.bandDialogTitle.textContent = definition.name;
-  elements.bandDescription.textContent = definition.description;
-  elements.currentInput.value = band.current;
-  elements.natureInput.value = band.baseline;
-  elements.halfLifeInput.value = band.halfLifeMinutes;
-  elements.bandEnabled.checked = band.enabled;
-  renderRangePrompts(definition, state.rangePromptOverrides[bandId] ?? {});
-  updateBandOutputs();
-  elements.bandDialog.showModal();
+// Band commits are serialized: inline editing makes rapid edits across lanes the
+// happy path, and each PATCH must read the version produced by the one before it.
+// beginEdit runs immediately so a queued commit still shields its lane from polls.
+let bandCommitChain = Promise.resolve();
+
+function commitBand(bandId, patch, success, { light }) {
+  beginEdit(bandId);
+  const run = async () => {
+    try {
+      return await mutate(() => api.band(state.version, bandId, patch), success, {
+        light,
+        rollbackBands: [bandId],
+      });
+    } finally {
+      endEdit(bandId);
+    }
+  };
+  bandCommitChain = bandCommitChain.then(run, run);
+  return bandCommitChain;
 }
 
-function renderRangePrompts(definition, overrides) {
-  const fragment = document.createDocumentFragment();
-  for (const level of definition.levels) {
-    const wrapper = document.createElement('label');
-    wrapper.className = 'range-prompt';
-    const title = document.createElement('span');
-    title.textContent = `${level.min}–${level.max} · ${level.word}`;
-    const builtIn = document.createElement('small');
-    builtIn.textContent = level.instruction;
-    const input = document.createElement('textarea');
-    input.rows = 2;
-    input.maxLength = 1200;
-    input.dataset.levelId = level.id;
-    input.value = overrides[level.id] ?? '';
-    input.placeholder = 'Optional addition';
-    wrapper.append(title, builtIn, input);
-    fragment.append(wrapper);
-  }
-  elements.rangePrompts.replaceChildren(fragment);
-}
+// Handlers passed to the renderer.
+const handlers = {
+  beginInteraction() {}, // editing is tracked by focus + commit; this is a no-op hook
+  commit(bandId, kind, value) {
+    const patch = kind === 'current' ? { current: value } : { baseline: value };
+    const message = kind === 'current' ? 'Now updated.' : 'Nature updated.';
+    return commitBand(bandId, patch, message, { light: true });
+  },
+  commitField(bandId, patch, message) {
+    return commitBand(bandId, patch, message, { light: false });
+  },
+  resetLane(bandId) {
+    return commitBand(bandId, { reset: true }, 'Lane reset to Nature.', { light: false });
+  },
+  saveRange(bandId, levelId, text) {
+    return commitBand(
+      bandId,
+      { rangePromptOverrides: { [levelId]: text } },
+      text ? 'Range language saved.' : 'Range language cleared.',
+      { light: false },
+    );
+  },
+};
 
-function updateBandOutputs() {
-  elements.currentOutput.textContent = Math.round(elements.currentInput.value);
-  elements.natureOutput.textContent = Math.round(elements.natureInput.value);
-}
+// Focus tracking is lane-based, not control-based. Focus movement inside one
+// lane is idempotent; only entering/leaving the lane changes the set.
+elements.bands.addEventListener('focusin', (event) => {
+  const band = event.target.closest('.band');
+  if (band) focusedBands.add(band.dataset.band);
+});
+elements.bands.addEventListener('focusout', (event) => {
+  const band = event.target.closest('.band');
+  if (band && !band.contains(event.relatedTarget)) focusedBands.delete(band.dataset.band);
+});
 
 function confirmAction({ title, text, label, run, dangerous = false }) {
   confirming = run;
@@ -206,21 +374,22 @@ elements.pauseButton.addEventListener('click', () => mutate(
   () => api.enabled(state.version, !state.enabled),
   state.enabled ? 'Feelings paused.' : 'Feelings resumed.',
 ));
-elements.currentInput.addEventListener('input', updateBandOutputs);
-elements.natureInput.addEventListener('input', updateBandOutputs);
-elements.saveBand.addEventListener('click', (event) => {
-  event.preventDefault();
-  elements.bandDialog.close();
-  mutate(() => api.band(state.version, selectedBandId, {
-    current: Number(elements.currentInput.value),
-    baseline: Number(elements.natureInput.value),
-    halfLifeMinutes: Number(elements.halfLifeInput.value),
-    enabled: elements.bandEnabled.checked,
-    rangePromptOverrides: Object.fromEntries(
-      [...elements.rangePrompts.querySelectorAll('textarea')]
-        .map((input) => [input.dataset.levelId, input.value.trim() || null]),
-    ),
-  }), 'Feeling updated.');
+elements.hostPresenceButton.addEventListener('click', async () => {
+  if (!statusPresence || !['available', 'enabled'].includes(statusPresence.status)) return;
+  const action = statusPresence.status === 'enabled' ? 'disable' : 'enable';
+  elements.hostPresenceButton.disabled = true;
+  try {
+    statusPresence = await api.setStatusPresence(action);
+    syncStatusPresence();
+    toast(action === 'enable' ? 'V added to the Claude status line.' : 'V removed from the Claude status line.');
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'status_line_conflict') {
+      toast('Claude already has a custom status line; nothing was overwritten.', 'error');
+    } else {
+      toast('Host presence could not be changed.', 'error');
+    }
+    await refreshStatusPresence();
+  }
 });
 elements.reactionInstruction.addEventListener('input', updateCount);
 elements.saveInstruction.addEventListener('click', () => mutate(
@@ -256,4 +425,5 @@ document.addEventListener('visibilitychange', () => {
 });
 
 await refresh();
+await refreshStatusPresence();
 pollTimer = setInterval(() => refresh({ quiet: true }), 2000);

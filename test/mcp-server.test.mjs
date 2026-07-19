@@ -20,9 +20,51 @@ test('MCP exposes explicit local state controls and no generic execution tool', 
     'feelings_reset',
     'feelings_erase',
     'feelings_open_dashboard',
+    'feelings_get_status_presence',
+    'feelings_set_status_presence',
   ]);
   assert.ok(listed.result.tools.every((tool) => tool.inputSchema.additionalProperties === false));
   assert.ok(!names.some((name) => /exec|shell|write_file/u.test(name)));
+  assert.equal(
+    listed.result.tools.find((entry) => entry.name === 'feelings_set_status_presence').annotations.destructiveHint,
+    true,
+  );
+  assert.equal(
+    listed.result.tools.find((entry) => entry.name === 'feelings_reset').annotations.destructiveHint,
+    true,
+  );
+  assert.equal(
+    listed.result.tools.find((entry) => entry.name === 'feelings_erase').annotations.destructiveHint,
+    true,
+  );
+  await service.close();
+});
+
+test('MCP status presence is explicit, host-aware, and reversible', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'viventium-mcp-test-'));
+  const configDir = await mkdtemp(path.join(os.tmpdir(), 'viventium-claude-config-'));
+  t.after(() => Promise.all([
+    rm(dir, { recursive: true, force: true }),
+    rm(configDir, { recursive: true, force: true }),
+  ]));
+  const service = createMcpService({
+    store: createStateStore({ dir }), openBrowser: async () => {}, host: 'claude', configDir,
+  });
+  let response = await service.handle({
+    jsonrpc: '2.0', id: 20, method: 'tools/call',
+    params: { name: 'feelings_get_status_presence', arguments: {} },
+  });
+  assert.equal(response.result.structuredContent.status, 'available');
+  response = await service.handle({
+    jsonrpc: '2.0', id: 21, method: 'tools/call',
+    params: { name: 'feelings_set_status_presence', arguments: { action: 'enable' } },
+  });
+  assert.equal(response.result.structuredContent.status, 'enabled');
+  response = await service.handle({
+    jsonrpc: '2.0', id: 22, method: 'tools/call',
+    params: { name: 'feelings_set_status_presence', arguments: { action: 'disable' } },
+  });
+  assert.equal(response.result.structuredContent.status, 'available');
   await service.close();
 });
 

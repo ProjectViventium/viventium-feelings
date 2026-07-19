@@ -11,7 +11,7 @@
       "name": "viventium-feelings",
       "source": "./plugins/viventium-feelings",
       "description": "Feelings that move, persist, and fade for Claude Code.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "Adrien Beyk"
       },

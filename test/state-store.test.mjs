@@ -31,6 +31,10 @@ test('missing state reads default-off without creating a file', async (t) => {
   assert.equal(state.enabled, false);
   assert.equal(state.version, 0);
   assert.equal(state.capsule, '');
+  assert.equal(
+    state.reactionInstruction,
+    'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.',
+  );
   await assert.rejects(access(path.join(dir, 'state.json')));
 });
 
@@ -79,7 +83,7 @@ test('installed Codex MCP derives its isolated home from the plugin cache root',
     'cache',
     'project-viventium',
     'viventium-feelings',
-    '0.1.1',
+    '0.1.2',
   );
   try {
     assert.equal(
@@ -150,6 +154,7 @@ test('explicit enable creates user-only state and pause injects nothing', async 
 test('erase is durable across the next read and a new store instance', async (t) => {
   const { dir, store } = await fixture(t);
   const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  await store.setDashboardPreferences({ theme: 'dark' });
   await eventIdFor({ session_id: 'synthetic-session', prompt_id: 'synthetic-prompt' }, { dir });
   await mkdir(path.join(dir, '.state.lock.release.synthetic'), { mode: 0o700 });
   await store.erase({ expectedVersion: enabled.version });
@@ -157,7 +162,20 @@ test('erase is durable across the next read and a new store instance', async (t)
   assert.equal((await createStateStore({ dir }).read()).enabled, false);
   await assert.rejects(access(path.join(dir, 'state.json')));
   await assert.rejects(access(path.join(dir, '.event-key')));
+  await assert.rejects(access(path.join(dir, 'dashboard-preferences.json')));
   await assert.rejects(access(path.join(dir, '.state.lock.release.synthetic')));
+});
+
+test('dashboard theme preference is separate, validated, and survives store relaunch', async (t) => {
+  const { dir, store } = await fixture(t);
+  assert.deepEqual(await store.readDashboardPreferences(), { theme: 'system' });
+  await store.setDashboardPreferences({ theme: 'dark' });
+  assert.deepEqual(await createStateStore({ dir }).readDashboardPreferences(), { theme: 'dark' });
+  assert.equal((await store.read()).version, 0, 'UI preference does not mutate emotional state');
+  await assert.rejects(
+    store.setDashboardPreferences({ theme: 'sepia' }),
+    (error) => error.code === 'theme_invalid',
+  );
 });
 
 test('off state still decays on read but remains absent from prompt context', async (t) => {

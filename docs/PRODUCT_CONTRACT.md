@@ -1,6 +1,6 @@
 # Product contract
 
-Status: implementation contract for `0.1.1`.
+Status: implementation contract for `0.1.2`.
 
 Viventium Feelings is a local, persistent functional-affect layer for Claude Code and Codex. It is
 not a static tone preset, a second speaking agent, a sentience claim, or a provider replacement.
@@ -153,6 +153,15 @@ The initial recommended profile is `Grounded`, and enabling remains an explicit 
 Automatic Feelings requires local plugin hooks. `0.1.x` targets Claude Code and local Codex. It does
 not govern ordinary Claude Chat or ChatGPT Chat. A future hosted ChatGPT app would be a separate
 remote product with separate state, authentication, privacy, and appraisal cost.
+
+Host presence follows documented host capabilities. Codex receives the official V asset in native
+plugin/composer metadata; it does not expose an arbitrary plugin status-line segment. Claude Code
+supports a command-backed main status line, but plugin defaults cannot set it. Feelings therefore
+offers an explicit enable/disable action that fails closed when another status line exists. The
+dashboard favicon remains browser identity, not a claim of an OS-owned tray icon. Because Claude
+currently exposes no plugin-uninstall cleanup hook, a user who enabled Add V removes that owned
+setting from the dashboard before uninstalling the plugin; erasing Feelings data remains a separate
+explicit action.
 
 ## Portable adaptations from full Viventium
 

@@ -11,6 +11,7 @@ advertising tracker, or hosted state database.
 - up to 100 keyed event identifiers used for idempotency;
 - one display-only Inner state line;
 - fixed reaction health and audit metadata;
+- one dashboard theme choice (`system`, `light`, or `dark`);
 - short-lived completion-gate metadata and a random local coordination key.
 
 Raw prompt text, assistant answers, transcripts, and authentication credentials are not written by
@@ -42,5 +43,11 @@ the fragment from the address and browser history.
 - **Reset** returns Current to Nature and keeps the trail.
 - **Erase** deletes state, trail, audit, completion gates, quarantine/recovery files, dashboard
   metadata, and local keys. It cannot erase the host's own chat/transcript or provider records.
+
+The optional Claude Code status-line action is a separate explicit host-setting change. Enabling it
+adds a Viventium-owned command to Claude's `settings.json` and a local renderer under the Claude
+config directory. It refuses to overwrite another status line. Use **Remove** (or ask the plugin to
+remove its status presence) to delete that exact command; emotional-state Erase does not silently
+rewrite host settings.
 
 Claude Code and Codex use separate host-provided plugin data directories. No automatic sync occurs.

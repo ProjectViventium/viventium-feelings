@@ -5,6 +5,12 @@ import http from 'node:http';
 import path from 'node:path';
 
 import { ConflictError, ValidationError, createStateStore } from './state-store.mjs';
+import {
+  StatusPresenceError,
+  disableStatusPresence,
+  enableStatusPresence,
+  getStatusPresence,
+} from './status-presence.mjs';
 
 const DASHBOARD_ROOT = path.resolve(import.meta.dirname, '..', 'dashboard');
 const MAX_BODY_BYTES = 64 * 1024;
@@ -14,6 +20,7 @@ const CONTENT_TYPES = Object.freeze({
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
 });
 
 function securityHeaders(contentType) {
@@ -70,13 +77,28 @@ function onlyKeys(value, allowed) {
   if (Object.keys(value).some((key) => !allowed.includes(key))) throw new ValidationError();
 }
 
-async function serveStatic(request, response, pathname) {
+async function serveStatic(request, response, pathname, store) {
   const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
-  if (!/^(?:index\.html|dashboard\.css|dashboard\.js|api\.js|render\.js)$/u.test(relative)) {
+  if (!/^(?:index\.html|dashboard\.css|dashboard\.js|api\.js|render\.js|theme-init\.js|viventium-v\.png)$/u.test(relative)) {
     sendJson(response, 404, { error: { code: 'not_found' } });
     return;
   }
-  const filePath = path.join(DASHBOARD_ROOT, relative);
+  const filePath = relative === 'viventium-v.png'
+    ? path.resolve(DASHBOARD_ROOT, '..', 'assets', 'viventium-v.png')
+    : path.join(DASHBOARD_ROOT, relative);
+  if (relative === 'index.html') {
+    const preferences = await store.readDashboardPreferences();
+    const html = (await readFile(filePath, 'utf8')).replace(
+      'content="system" data-viventium-theme',
+      `content="${preferences.theme}" data-viventium-theme`,
+    );
+    response.writeHead(200, {
+      ...securityHeaders(CONTENT_TYPES['.html']),
+      'content-length': Buffer.byteLength(html),
+    });
+    response.end(html);
+    return;
+  }
   const details = await stat(filePath);
   response.writeHead(200, {
     ...securityHeaders(CONTENT_TYPES[path.extname(filePath)] ?? 'application/octet-stream'),
@@ -120,7 +142,7 @@ export async function startDashboardServer({
           sendJson(response, 405, { error: { code: 'method_not_allowed' } });
           return;
         }
-        await serveStatic(request, response, url.pathname);
+        await serveStatic(request, response, url.pathname, store);
         return;
       }
       if (url.pathname === '/api/session' && request.method === 'POST') {
@@ -150,10 +172,30 @@ export async function startDashboardServer({
         return;
       }
       if (url.pathname === '/api/state' && request.method === 'GET') {
-        sendJson(response, 200, { state: await store.read(), host });
+        sendJson(response, 200, {
+          state: await store.read(),
+          host,
+          preferences: await store.readDashboardPreferences(),
+        });
+        return;
+      }
+      if (url.pathname === '/api/status-presence' && request.method === 'GET') {
+        sendJson(response, 200, await getStatusPresence({ host, stateDir: store.dir }));
         return;
       }
       const body = await readJson(request);
+      if (url.pathname === '/api/dashboard-preferences' && request.method === 'PATCH') {
+        onlyKeys(body, ['theme']);
+        sendJson(response, 200, { preferences: await store.setDashboardPreferences(body) });
+        return;
+      }
+      if (url.pathname === '/api/status-presence' && request.method === 'POST') {
+        onlyKeys(body, ['action']);
+        if (!['enable', 'disable'].includes(body.action)) throw new ValidationError('action_invalid');
+        const action = body.action === 'enable' ? enableStatusPresence : disableStatusPresence;
+        sendJson(response, 200, await action({ host, stateDir: store.dir }));
+        return;
+      }
       if (url.pathname === '/api/enabled' && request.method === 'PATCH') {
         onlyKeys(body, ['expectedVersion', 'enabled']);
         sendJson(response, 200, { state: await store.setEnabled(body) });
@@ -189,6 +231,8 @@ export async function startDashboardServer({
     } catch (error) {
       if (error instanceof ConflictError) {
         sendJson(response, 409, { error: { code: error.code } });
+      } else if (error instanceof StatusPresenceError) {
+        sendJson(response, error.code === 'status_line_conflict' ? 409 : 422, { error: { code: error.code } });
       } else if (error instanceof ValidationError || error instanceof SyntaxError) {
         sendJson(response, 422, { error: { code: error.code ?? 'json_invalid' } });
       } else {

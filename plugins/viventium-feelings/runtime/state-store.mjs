@@ -36,13 +36,14 @@ import { withOwnedDirectoryLock } from './owned-directory-lock.mjs';
 
 const SCHEMA_VERSION = 1;
 const STATE_FILE = 'state.json';
+const DASHBOARD_PREFERENCES_FILE = 'dashboard-preferences.json';
 const LOCK_DIR = '.state.lock';
 const LOCK_OWNER = 'owner.json';
 const DEFAULT_LOCK_WAIT_MS = 4_000;
 const STALE_LOCK_MS = 30_000;
 const MAX_AUDIT_BYTES = 1_000_000;
 const DEFAULT_REACTION_INSTRUCTION =
-  'React to what genuinely moves Viventium. Let each change match how much the moment matters. Move only the feelings the moment actually touches, and leave nature unchanged.';
+  'React to what genuinely moves Viventium. Prefer small natural changes. Move only the feelings the moment actually touches, and leave nature unchanged.';
 
 export class ConflictError extends Error {
   constructor() {
@@ -416,6 +417,26 @@ async function appendAudit(dir, entry) {
 
 export function createStateStore({ dir = resolveStateDir(), now = () => new Date(), lockWaitMs } = {}) {
   const statePath = path.join(dir, STATE_FILE);
+  const dashboardPreferencesPath = path.join(dir, DASHBOARD_PREFERENCES_FILE);
+
+  async function readDashboardPreferences() {
+    try {
+      const parsed = JSON.parse(await readFile(dashboardPreferencesPath, 'utf8'));
+      return { theme: ['system', 'light', 'dark'].includes(parsed?.theme) ? parsed.theme : 'system' };
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error instanceof SyntaxError) return { theme: 'system' };
+      throw error;
+    }
+  }
+
+  async function setDashboardPreferences({ theme }) {
+    if (!['system', 'light', 'dark'].includes(theme)) throw new ValidationError('theme_invalid');
+    return withLock(dir, async () => {
+      const preferences = { theme };
+      await atomicWriteJson(dashboardPreferencesPath, preferences);
+      return preferences;
+    }, lockWaitMs);
+  }
 
   async function readPersisted({ recover = true } = {}) {
     try {
@@ -739,6 +760,7 @@ export function createStateStore({ dir = resolveStateDir(), now = () => new Date
       await rm(path.join(dir, 'audit.jsonl.1'), { force: true });
       await rm(path.join(dir, 'jobs'), { recursive: true, force: true });
       await rm(path.join(dir, '.event-key'), { force: true });
+      await rm(dashboardPreferencesPath, { force: true });
       const residuals = (await readdir(dir).catch(() => [])).filter((name) => (
         /^state\.corrupt\.\d+\.json$/u.test(name)
         || /^\.state\.json\..+\.tmp$/u.test(name)
@@ -762,6 +784,7 @@ export function createStateStore({ dir = resolveStateDir(), now = () => new Date
   return {
     dir,
     statePath,
+    dashboardPreferencesPath,
     read,
     readPersisted,
     exists,
@@ -772,6 +795,8 @@ export function createStateStore({ dir = resolveStateDir(), now = () => new Date
     reset,
     commitReaction,
     recordReactionHealth,
+    readDashboardPreferences,
+    setDashboardPreferences,
     erase,
   };
 }

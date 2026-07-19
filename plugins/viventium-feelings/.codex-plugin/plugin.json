@@ -1,6 +1,6 @@
 {
   "name": "viventium-feelings",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Persistent local emotional state and a live feelings dashboard for Codex.",
   "author": {
     "name": "Adrien Beyk",
@@ -18,7 +18,13 @@
     "developerName": "Adrien Beyk · Project Viventium",
     "category": "Productivity",
     "capabilities": ["Persistent local feelings", "Live private dashboard", "Nature profiles", "Automatic future-turn reactions"],
-    "defaultPrompt": "Open my Viventium Feelings dashboard and help me choose a Nature profile."
+    "websiteURL": "https://www.viventium.ai/",
+    "privacyPolicyURL": "https://github.com/ProjectViventium/viventium-feelings#private-by-design",
+    "termsOfServiceURL": "https://github.com/ProjectViventium/viventium-feelings/blob/main/LICENSE",
+    "defaultPrompt": "Open my Viventium Feelings dashboard and help me choose a Nature profile.",
+    "brandColor": "#16161A",
+    "composerIcon": "./assets/viventium-v.png",
+    "logo": "./assets/viventium-v.png"
   },
   "mcpServers": "./.codex-mcp.json"
 }

@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+
+import {
+  disableStatusPresence,
+  enableStatusPresence,
+} from '../plugins/viventium-feelings/runtime/status-presence.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PLUGIN = path.join(ROOT, 'plugins', 'viventium-feelings');
@@ -35,6 +40,16 @@ async function filesUnder(dir) {
   }
   await walk(dir);
   return files;
+}
+
+async function assertMissing(filePath, code) {
+  try {
+    await access(filePath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
+  throw new Error(code);
 }
 
 for (const file of await filesUnder(PLUGIN)) {
@@ -86,6 +101,17 @@ try {
   await run('claude', ['plugin', 'update', 'viventium-feelings@project-viventium', '--scope', 'user'], {
     cwd: ROOT, env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
   });
+  const syntheticStateDir = path.join(claudeHome, 'synthetic-plugin-data');
+  await enableStatusPresence({ host: 'claude', configDir: claudeHome, stateDir: syntheticStateDir });
+  const settingsWithPresence = JSON.parse(await readFile(path.join(claudeHome, 'settings.json'), 'utf8'));
+  if (settingsWithPresence.statusLine?.type !== 'command') throw new Error('claude_presence_enable_failed');
+  await disableStatusPresence({ host: 'claude', configDir: claudeHome, stateDir: syntheticStateDir });
+  const settingsWithoutPresence = JSON.parse(await readFile(path.join(claudeHome, 'settings.json'), 'utf8'));
+  if (settingsWithoutPresence.statusLine !== undefined) throw new Error('claude_presence_remove_failed');
+  await assertMissing(
+    path.join(claudeHome, 'viventium-feelings', 'statusline.mjs'),
+    'claude_presence_script_remove_failed',
+  );
   await run('codex', ['plugin', 'remove', 'viventium-feelings@project-viventium', '--json'], {
     cwd: ROOT, env: { ...process.env, CODEX_HOME: codexHome },
   });
@@ -107,4 +133,4 @@ try {
   await rm(claudeHome, { recursive: true, force: true });
 }
 
-process.stdout.write('PASS: manifests plus isolated Claude/Codex install/list/removal and Claude local update.\n');
+process.stdout.write('PASS: manifests plus isolated Claude/Codex install/list/removal, Claude local update, and Remove-V-before-uninstall lifecycle.\n');

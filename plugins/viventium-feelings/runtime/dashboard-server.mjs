@@ -5,6 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 import { ConflictError, ValidationError, createStateStore } from './state-store.mjs';
+import { eraseLocalFeelings } from './erase-local.mjs';
 import {
   StatusPresenceError,
   disableStatusPresence,
@@ -233,31 +234,12 @@ export async function startDashboardServer({
       }
       if (url.pathname === '/api/state' && request.method === 'DELETE') {
         onlyKeys(body, ['expectedVersion']);
-        const erased = await store.erase(body);
-        let statusPresence;
-        try {
-          statusPresence = await getStatusPresence({
-            host,
-            configDir: statusPresenceConfigDir,
-            stateDir: store.dir,
-          });
-          if (statusPresence.status === 'enabled') {
-            statusPresence = await disableStatusPresence({
-              host,
-              configDir: statusPresenceConfigDir,
-              stateDir: store.dir,
-            });
-          }
-        } catch (error) {
-          statusPresence = {
-            host,
-            status: 'cleanup_failed',
-            canEnable: false,
-            message: 'Feelings data was erased, but owned host presence could not be removed.',
-            error: error instanceof StatusPresenceError ? error.code : 'status_cleanup_failed',
-          };
-        }
-        sendJson(response, 200, { ...erased, statusPresence });
+        sendJson(response, 200, await eraseLocalFeelings({
+          store,
+          expectedVersion: body.expectedVersion,
+          host,
+          configDir: statusPresenceConfigDir,
+        }));
         return;
       }
       sendJson(response, 404, { error: { code: 'not_found' } });

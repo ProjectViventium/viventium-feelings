@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
 import { startDashboardServer } from './dashboard-server.mjs';
+import { eraseLocalFeelings } from './erase-local.mjs';
 import { createStateStore, resolveHost } from './state-store.mjs';
 import { disableStatusPresence, enableStatusPresence, getStatusPresence } from './status-presence.mjs';
 
@@ -31,7 +32,7 @@ const TOOLS = Object.freeze([
     profileId: { type: 'string', enum: ['grounded', 'candid', 'warm', 'curious'] },
   }, ['expectedVersion', 'profileId']),
   tool('feelings_reset', 'Reset Current feelings to Nature.', { expectedVersion: version }, ['expectedVersion'], { destructiveHint: true }),
-  tool('feelings_erase', 'Permanently erase all local Feelings state, trail, gates, audit, and key.', {
+  tool('feelings_erase', 'Permanently erase local Feelings data and any Viventium-owned Claude status line.', {
     expectedVersion: version,
   }, ['expectedVersion'], { destructiveHint: true }),
   tool('feelings_open_dashboard', 'Open the private live Feelings dashboard in the local browser.', {}, []),
@@ -109,11 +110,22 @@ export function createMcpService({ store = createStateStore(), openBrowser, host
     }
     if (name === 'feelings_erase') {
       assertOnlyKeys(args, ['expectedVersion']);
-      return success(await store.erase(args), 'All local Feelings data erased.');
+      const erased = await eraseLocalFeelings({
+        store,
+        expectedVersion: args.expectedVersion,
+        host,
+        configDir,
+      });
+      const message = erased.statusPresence?.status === 'cleanup_failed'
+        ? 'Feelings data erased. Owned host presence still needs manual removal.'
+        : 'All local Feelings data and owned host presence erased.';
+      return success(erased, message);
     }
     if (name === 'feelings_open_dashboard') {
       assertOnlyKeys(args, []);
-      if (!dashboard || dashboard.isClosed()) dashboard = await startDashboardServer({ store, host });
+      if (!dashboard || dashboard.isClosed()) {
+        dashboard = await startDashboardServer({ store, host, statusPresenceConfigDir: configDir });
+      }
       await opener(dashboard.url);
       return success({ opened: true }, 'The private Feelings dashboard is open.');
     }

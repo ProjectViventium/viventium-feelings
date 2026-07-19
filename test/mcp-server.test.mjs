@@ -47,9 +47,8 @@ test('MCP status presence is explicit, host-aware, and reversible', async (t) =>
     rm(dir, { recursive: true, force: true }),
     rm(configDir, { recursive: true, force: true }),
   ]));
-  const service = createMcpService({
-    store: createStateStore({ dir }), openBrowser: async () => {}, host: 'claude', configDir,
-  });
+  const store = createStateStore({ dir });
+  const service = createMcpService({ store, openBrowser: async () => {}, host: 'claude', configDir });
   let response = await service.handle({
     jsonrpc: '2.0', id: 20, method: 'tools/call',
     params: { name: 'feelings_get_status_presence', arguments: {} },
@@ -65,6 +64,19 @@ test('MCP status presence is explicit, host-aware, and reversible', async (t) =>
     params: { name: 'feelings_set_status_presence', arguments: { action: 'disable' } },
   });
   assert.equal(response.result.structuredContent.status, 'available');
+
+  const enabled = await store.setEnabled({ expectedVersion: 0, enabled: true });
+  await service.handle({
+    jsonrpc: '2.0', id: 23, method: 'tools/call',
+    params: { name: 'feelings_set_status_presence', arguments: { action: 'enable' } },
+  });
+  response = await service.handle({
+    jsonrpc: '2.0', id: 24, method: 'tools/call',
+    params: { name: 'feelings_erase', arguments: { expectedVersion: enabled.version } },
+  });
+  assert.equal(response.result.structuredContent.erased, true);
+  assert.equal(response.result.structuredContent.statusPresence.status, 'available');
+  assert.equal(await store.exists(), false);
   await service.close();
 });
 
